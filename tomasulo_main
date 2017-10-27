@@ -4,9 +4,9 @@
 # tomasulo_main.py 
 # 1. # of ROB entries 
 # 2. # of reservation stations for each FU
-# 3. # of execution cycles for each FU
+# 3. # of cycles for each FU
 # 4. # of cycles for memory access 
-# 5. 
+# 5. #
 ############################################################################################################
 
 ############################################################################################################
@@ -38,8 +38,9 @@
 #    MEM: load can go to mem if no forwarding-from-a-store was found,
 #		  takes 1 cycle to perform the forwarding if a match is found,
 #         load gets the value and clears its entry in the queue
-#     WB: 
-# COMMIT: store writes to memory (dequed)
+#     WB: broadcast results on CDB, write back to RS and ROB, mark ready bit in ROB
+# COMMIT: when instruction is the oldest in ROB, store writes to memory (dequed)/write results to ARF,
+#         advance ROB head to next instruction 
 ############################################################################################################
 
 ############################################################################################################
@@ -85,12 +86,19 @@
 
 import sys
 
+# Global Variables
+memory = [] # needs to be initialized, 256B(64W), needs its own function on how to reference locations in mem by word/byte
+
+############################################################################################################
+# MAIN
+############################################################################################################		
 def main(argv): # argv is a list of command line arguments
 	# command line arguments
+	# write later
 	
-	#
+	# assume for now everything takes one cycle
 	
-	memory = [] # needs to be initialized, 256B(64W), needs its own function on how to reference locations in mem by word/byte
+	
 	cycle_counter = 0;
 	instruction_counter = 0;
 	pipeline = []; # 5 stages: ISSUE(0), EX(1), MEM(2), WB(3), and COMMIT(4)
@@ -110,6 +118,21 @@ def main(argv): # argv is a list of command line arguments
 		for i in range(1, 5): # 5 stages
 			pipeline[i] = pipeline [i-1] # need to accomodate for leaving instructions
 		print "Current state: " + str(pipeline)
+############################################################################################################
+
+############################################################################################################
+# MEMORY MANAGEMENT
+############################################################################################################		
+def memory_initialize():
+	# code to initialize memory
+
+def memory_store_at_addr(addr, value):
+	# code to store value at addr
+	
+def memory_load_from_addr(addr):
+	# code to load from addr
+############################################################################################################
+
 
 if __name__ == "__main__":
     main(sys.argv[1:])
