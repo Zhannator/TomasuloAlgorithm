@@ -10,8 +10,6 @@
 ############################################################################################################
 
 ############################################################################################################
-
-############################################################################################################
 # INSTRUCTION SET ARCHITECTURE
 ############################################################################################################
 # Data Transfer Instructions
@@ -92,47 +90,59 @@ memory = [] # needs to be initialized, 256B(64W), needs its own function on how 
 ############################################################################################################
 # MAIN
 ############################################################################################################		
-def main(argv): # argv is a list of command line arguments
+#def main(argv): # argv is a list of command line arguments
+def main():
 	# command line arguments
 	# write later
 	
 	# assume for now everything takes one cycle
+	# assume no dependencies
 	
+    cycle_counter = 0;
+    instruction_counter = 0;
+    pipeline = [-1, -1, -1, -1, -1] # 5 stages: ISSUE(0), EX(1), MEM(2), WB(3), and COMMIT(4)
+    PC = 0 # in words
+    instructions = ["Add.d R1, R2, R3", "Add.d R1, R2, R3", "Add.d R1, R2, R3", "Add.d R1, R2, R3", "Add.d R1, R2, R3"]
 	
-	cycle_counter = 0;
-	instruction_counter = 0;
-	pipeline = []; # 5 stages: ISSUE(0), EX(1), MEM(2), WB(3), and COMMIT(4)
-	
-
-	
-	instructions = ["Add.d F1, F2, F3"]
-	
-	while (1):
-		if (instruction_exists):
-			# get new instruction
-			# need to accomodate for incoming
-			pipeline[0] = i;
-			i++;
-		cycles = cycles + 1;
-		# advance instructions in pipeline
-		for i in range(1, 5): # 5 stages
-			pipeline[i] = pipeline [i-1] # need to accomodate for leaving instructions
-		print "Current state: " + str(pipeline)
+    for instruction in instructions:
+        #leaving_instruction = pipeline[4]
+        for i in range(4, 0, -1): # 5 stages
+            pipeline[i] = pipeline[i-1] # need to accomodate for leaving instructions
+        # get new instruction
+        pipeline[0] = PC;
+        PC = PC + 4;
+        cycle_counter = cycle_counter + 1;
+        # advance instructions in pipeline
+        print ("Current cycle: " + str(cycle_counter))
+        print ("Current state: " + str(pipeline))
+    # advance leftover instructions in pipeline
+    for j in range(0, 5):
+        #leaving_instruction = pipeline[4]
+        for i in range(4, 0, -1): # 5 stages
+            pipeline[i] = pipeline [i-1] # need to accomodate for leaving instructions
+        pipeline[0] = -1
+        cycle_counter = cycle_counter + 1;
+        print ("Current cycle: " + str(cycle_counter))
+        print ("Current state: " + str(pipeline))
 ############################################################################################################
 
 ############################################################################################################
 # MEMORY MANAGEMENT
 ############################################################################################################		
 def memory_initialize():
-	# code to initialize memory
+    # code to initialize memory
+    print ("test")
 
 def memory_store_at_addr(addr, value):
 	# code to store value at addr
-	
+    print ("test")
+    
 def memory_load_from_addr(addr):
 	# code to load from addr
+    print ("test")
 ############################################################################################################
 
 
 if __name__ == "__main__":
-    main(sys.argv[1:])
+    #main(sys.argv[1:])
+    main()
