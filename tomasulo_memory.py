@@ -21,3 +21,8 @@ def memory_load_from_addr(addr):
 	# code to load from addr
     print ("test")
 ############################################################################################################
+
+if __name__ == "__main__":
+    memory_initialize()
+    memory_store_at_addr(32, 100) # store 100 at address 32
+    memory_load_from_addr(32) # load 100 from address 32
