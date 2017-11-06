@@ -5,28 +5,9 @@
 
 rob = []
 
-instruction_buffer = ["Add.d R1 R2 R3", "Add.d R2 R2 R3", "Add.d R3 R2 R3", "Add.d R4 R2 R3", "Add.d R5 R2 R3"]
-rob_check_counter = 0
-rob_add_counter = 0
-rob_update_index = 0
-rob_done_counter = num_rob_entries
+rob_check_counter = 0 # rob check counter for checking to see if the top instruction is ready to commit
+rob_add_counter = 0 # rob pointer for where to add the next instruction in rob buffer
 
-
-##########################################################
-# MAIN
-##########################################################
-
-def main():
-	
-	rob_initialize()
-	
-	for instruction in instruction_buffer:
-		dest = instruction.split()[1]
-		rob_instr_add(dest)
-	
-	rob_check()
-		
-##########################################################
 def rob_initialize():
     # initialize rob
     global rob
@@ -79,9 +60,13 @@ def rob_update_value(dest_tag, rs_value):
     
     rob[rob_update_index]["value"] = rs_value
 	
-	
-	
-	
-	
 if __name__ == "__main__":
-    main()
+    instruction_buffer = ["Add.d R1 R2 R3", "Add.d R2 R2 R3", "Add.d R3 R2 R3", "Add.d R4 R2 R3", "Add.d R5 R2 R3"]
+    
+    rob_initialize()
+	
+	for instruction in instruction_buffer:
+		dest = instruction.split()[1]
+		rob_instr_add(dest)
+	
+	rob_check()
