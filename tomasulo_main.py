@@ -1,94 +1,11 @@
 #!/usr/bin/python
 # -*- coding: utf-8 -*-
 
-############################################################################################################
-# CONFIGURATIONS SET FROM input_file.txt
-############################################################################################################
-# 1. # of ROB entries for each FU 
-# 2. # of reservation stations for each FU
-# 3. # of cycles for each FU
-# 4. # of cycles for memory access 
-# 5. ROB enties
-# 6. set register values
-# 7. set memory values
-# 8. instructions
-############################################################################################################
-
-############################################################################################################
-# INSTRUCTION SET ARCHITECTURE
-############################################################################################################
-# Data Transfer Instructions
-# 	Ld Fa, offset(Ra)	Load a single precision floating point value to Fa
-# 	Sd Fa, offset(Ra)	Store a single precision floating point value to memory
-# Control Transfer Instructions
-# 	Beq Rs, Rt, offset	If Rs==Rt then branch to PC+4+offset<<2
-# 	Bne Rs, Rt, offset	If Rs!=Rt then branch to PC+4+offset<<2
-# ALU Instructions
-# 	Add Rd, Rs, Rt	Rd = Rs + Rt	Integer
-# 	Add.d Fd, Fs, Ft	Fd = Fs + Ft	FP
-# 	Addi Rt, Rs, immediate	Rt = Rs + immediate	Integer
-# 	Sub Rd, Rs, Rt	Rd = Rs - Rt	Integer
-# 	Sub.d Fd, Fs, Ft	Fd = Fs – Ft	FP
-# 	Mult.d Fd, Fs, Ft	Fd = Fs * Ft, assuming that Fd is enough to hold the result	FP
-############################################################################################################
-
-############################################################################################################
-# PIPELINE STAGES:
-############################################################################################################
-#  ISSUE: instruction fetch and decode, branch prediction
-#     EX: calculates addresses for loads and stores, branch resolution, 
-#		  uses load/store queue and doesn't occupy integer ALU, branch resolution
-#    MEM: load can go to mem if no forwarding-from-a-store was found,
-#		  takes 1 cycle to perform the forwarding if a match is found,
-#         load gets the value and clears its entry in the queue
-#     WB: broadcast results on CDB, write back to RS and ROB, mark ready bit in ROB
-# COMMIT: when instruction is the oldest in ROB, store writes to memory (dequed)/write results to ARF,
-#         advance ROB head to next instruction 
-############################################################################################################
-
-############################################################################################################
-# PROCESSOR COMPONENTS:
-############################################################################################################
-# 1 instruction buffer: instruction_buffer
-# 1 integer Architecture Register File (ARF): int_registers
-# 1 floating point Architecture Register File (ARF): fp_registers
-# 1 Register Aliasing Table (RAT): rat
-# 1 Reservation Station (RS) for Adder: adder_rs
-# 1 Reservation Station (RS) for Mult/Div: mult_div_rs
-# 1 Common Data Bus (CDB)
-# 1 Reorder Buffer (ROB): rob
-# ? 1 Branch Predictor (BP)
-# ? 1 Target Buffer (TB)
-# 1 load/store queue (similar to reservation station for memory unit,
-#	contains address and value (not useful for loads)): load_store_queue
-############################################################################################################
-
-############################################################################################################
-# HARDWARE UNITS
-############################################################################################################
-# Integer adder; unpipelined
-# FP adder; pipelined
-# FP multiplier; pipelined
-# Integer and FP register files, 32 entries each. Integer R0 is hardwired to 0.
-# Memory; single-ported; non-pipelined
-############################################################################################################
-
-############################################################################################################
-# BRANCH UNIT
-############################################################################################################	
-# Branch instructions are issued into the reservation stations of an integer ALU. We will 
-# implement the simplest one-bit predictor for each branch instruction. Use a BTB of 8 entries to store 
-# the target. Use the least significant 3 bits of the word address of the PC to index into the BTB. 
-# Prediction is done in the first cycle of execution (ISSUE stage). The branch is resolved at the end of 
-# the EX stage. Upon a misprediction, actions must be taken to squash wrong instructions. These include: 
-# 1. recover the RAT; 2. clear the reservation station’s wait-for tag fields for wrong instructions; 
-# 3. clear ROB entries that surpass the branch. Assume these actions take one cycle, and fetching from 
-# the correct instruction starts in the next cycle. For example, if misprediction is detected in cycle n, 
-# correct fetch should start at cycle n+2.
-############################################################################################################
-
 from sys import argv
 
+#
+alu_instructions_int = ["Add", "Addi", "Sub"]
+alu_instructions_fp = ["Add.d", "Sub.d", "Mult.d"]
 # Global Variables / Defaults
 num_rob_entries = 128 # # of ROB entries
 int_adder_properties = {
@@ -119,47 +36,16 @@ fp_registers = [] # needs to be initialized, 32 registers by DLX standard
 int_rat = [] # needs to be initialized, same size as ARF
 fp_rat = [] # needs to be initialized, same size as ARF
 rs = { # needs to be initialized
-    "int_adder_rs" : [{
-        "busy" : "no",
-        "op" : "",
-        "dest" : "",
-        "Vj" : "",
-        "Vk" : "",
-        "Qj" : 0,
-        "Qk" : 0
-    }],
-    "fp_adder_rs" : [{
-        "busy" : "no",
-        "op" : "",
-        "dest" : "",
-        "Vj" : "",
-        "Vk" : "",
-        "Qj" : 0,
-        "Qk" : 0
-    }],
-    "fp_multiplier_rs" : [{
-        "busy" : "no",
-        "op" : "",
-        "dest" : "",
-        "Vj" : "",
-        "Vk" : "",
-        "Qj" : 0,
-        "Qk" : 0
-    }]
+    "int_adder_rs" : [],
+    "fp_adder_rs" : [],
+    "fp_multiplier_rs" : []
 }
-rob = [{ # needs to be initialized
-    "busy" : 0,
-    "instruction" : "",
-    "state" : "",
-    "destination" : 0, # “dest" field of a store instruction records its location in the load/store queue
-    "value" : 0
-}]
-#load_store_queue = [{ # TODO!!! NEED TO BE IMPLEMENTED AS A QUEUE: https://docs.python.org/2/library/queue.html
+rob = []
+#load_store_queue = [{ # TODO!!! NEED TO BE IMPLEMENTED AS A QUEUE
 #    "addr" : 0,
 #    "value" : 0
 #}]
-timing_table = [] # needs to be updated during execution time (instruction, column for each stage)
-
+timing_table = [] # needs to be updated during execution time (pc, instruction, column for each stage)
 
 ############################################################################################################
 # MAIN
@@ -179,15 +65,96 @@ def main(input_filename): # argv is a list of command line arguments
     # initialize load/store queue
     #load_store_queue_initialize() #TODO
     
-	# assume for now everything takes one cycle
-	# assume no dependencies
-	
+    #-------------------------------------------------
+    # Pipeline V1: assume only # ALU Instructions and no dependencies 
+    #-------------------------------------------------
     cycle_counter = 0;
-    instruction_counter = 0;
-    pipeline = [-1, -1, -1, -1, -1] # 5 stages: ISSUE(0), EX(1), MEM(2), WB(3), and COMMIT(4)
-    PC = 0 # in words
+    PC = 0 # buffer index, incremented by 1
     
-	
+    # read instruction from instruction buffer
+    while(1):
+        # print results and exit if rob is empty and instruction_buffer is exerted
+        if rob_empty() and (PC >= len(instruction_buffer)):
+            time_table_print()
+            exit(0)
+        
+        # INCREMENT CYCLE
+        cycle_counter = cycle_counter + 1
+        
+        #-----------------------------------------------------
+        # ISSUE
+        #-----------------------------------------------------
+        if PC < len(instruction_buffer):
+            # parse instruction 
+            parsed_instruction = instruction_buffer[PC].split(" ")
+            # if alu instruction
+            if parsed_instruction[0] in alu_instructions_int:
+                print "THIS IS AN INTEGER ALU INSTRUCTION"
+                # check int RS
+                i = rs_available("int_adder_rs")
+                if i != -1: # if rs is available
+                    #add instuction
+                    rs_add("int_adder_rs", i, parsed_instruction[0], parsed_instruction[1], parsed_instruction[2], parsed_instruction[3])
+                    # add entry to timing table
+                    timing_table_add(PC, parsed_instruction[0], cycle_counter)
+                    PC = PC + 1
+            elif parsed_instruction[0] in alu_instructions_fp:
+                print "THIS IS A FP ALU INSTRUCTION"
+                rs_name = "fp_adder_rs"
+                if parsed_instruction[0] == "Mult.d":
+                    # if multiplier
+                    rs_name = "fp_multiplier_rs"
+                i = rs_available(rs_name)
+                if i != -1: # if rs is available
+                    # check if ROB entry is available
+                
+                    #add instuction 
+                    rs_add(rs_name, i, parsed_instruction[0], parsed_instruction[1], parsed_instruction[2], parsed_instruction[3])
+                    # add entry to timing table
+                    timing_table_add(PC, parsed_instruction[0], cycle_counter)
+                    PC = PC + 1
+                else:
+                    print("RS is full")
+                    print("PC: " + str(PC))
+                    print rs
+                    exit(0)
+            else:
+                print "THIS IS NOT AN ALU INSTRUCTION. EXITING..."
+                exit(0)
+            # if resources available: RS entry, ROB entry
+                # read RAT, read (available sources), update RAT
+                # write to RS and ROB
+            # else stall
+        
+        
+        
+        #-----------------------------------------------------
+        # EX
+        #-----------------------------------------------------
+        # wait for all operands to arrive: check RS tables
+            # complete to use functional units
+            # execute
+        #-----------------------------------------------------
+        # MEM
+        #-----------------------------------------------------
+        # broadcast result on CDB: any dependants will grab the value
+        # write result back to RS and ROB entries
+        # mark ready/finished bit in ROB
+        #-----------------------------------------------------
+        # WB
+        #-----------------------------------------------------
+        # when instruction is the oldest in the ROB (ROB head)
+            # write result if ready/finished bit is set (memory or register)
+        # advance ROB-head to next instruction
+    #-------------------------------------------------
+    
+    #-------------------------------------------------
+    # Simple Pipeline: assume everything stage takes one cycle and no dependencies
+    #-------------------------------------------------
+    cycle_counter = 0;
+    pipeline = [-1, -1, -1, -1, -1] # 5 stages: ISSUE(0), EX(1), MEM(2), WB(3), and COMMIT(4)
+    PC = 0 # in bytes
+
     for instruction in instruction_buffer:
         #leaving_instruction = pipeline[4]
         for i in range(4, 0, -1): # 5 stages
@@ -208,12 +175,18 @@ def main(input_filename): # argv is a list of command line arguments
         cycle_counter = cycle_counter + 1;
         print ("Current cycle: " + str(cycle_counter))
         print ("Current state: " + str(pipeline))
+    #-------------------------------------------------
 ############################################################################################################
 
 ############################################################################################################
 # INPUT FILE DECODER
 ############################################################################################################		
 def input_file_decoder(input_filename):
+    global int_adder_properties
+    global fp_adder_properties
+    global fp_multiplier_properties
+    global num_rob_entries
+    global instruction_buffer
     input_file = open(input_filename, 'r')
     for line_not_split in input_file:
         line = line_not_split.split(" ")
@@ -333,7 +306,7 @@ def mem_read(addr):
 ############################################################################################################
 
 ############################################################################################################
-# INITIALIZING OTHER UNITS
+# RAT
 ############################################################################################################
 def rat_initialize():
     # initialize rat
@@ -342,26 +315,105 @@ def rat_initialize():
     for i in range(0, 32):
         int_rat.append("R" + str(i))
         fp_rat.append("F" + str(i))
-    
+############################################################################################################
+
+############################################################################################################
+# RS
+############################################################################################################
 def rs_initialize():
     # initialize rs based on configs of FUs
     global rs
-    rs["int_adder_rs"] = rs["int_adder_rs"]*int_adder_properties["num_rs"]
-    rs["fp_adder_rs"] = rs["fp_adder_rs"]*fp_adder_properties["num_rs"]
-    rs["fp_multiplier_rs"] = rs["fp_multiplier_rs"]*fp_multiplier_properties["num_rs"]   
-     
+    rs_entry = {
+        "busy" : "no",
+        "op" : "",
+        "dest" : "",
+        "vj" : 0,
+        "vk" : 0,
+        "qj" : "",
+        "qk" : ""
+    }
+    for i in range(int_adder_properties["num_rs"]):  
+        rs["int_adder_rs"].append(rs_entry.copy())
+    for i in range(fp_adder_properties["num_rs"]):  
+        rs["fp_adder_rs"].append(rs_entry.copy())
+    for i in range(fp_multiplier_properties["num_rs"]):  
+        rs["fp_multiplier_rs"].append(rs_entry.copy())
+
+def rs_available(rs_name):
+    # check rs to see if there is an open station, if yes - return index, if no, return -1
+    global rs
+    for i, station in enumerate(rs[rs_name]):
+        if station["busy"] == "no":
+            return i
+    return -1
+    
+def rs_add(rs_name, i, op, dest, qj, qk):
+    # add rs entry at index
+    global rs
+    rs[rs_name][i]["busy"] = "yes"
+    rs[rs_name][i]["op"] = op
+    rs[rs_name][i]["dest"] = dest
+    # need to check if we already have these values available
+    rs[rs_name][i]["qj"] = qj
+    rs[rs_name][i]["qk"] = qk
+    # V2: don't forget to check for dependencies
+    print("TODO")
+    
+def rs_ready_to_execute():
+    print "TODO"
+    
+############################################################################################################
+
+############################################################################################################
+# ROB
+############################################################################################################
 def rob_initialize():
     # initialize rob
-    global rob
-    rob = rob*num_rob_entries
-    print rob
-    
+    print #TODO
+
+def rob_empty():
+    # return 1 if rob is empty, else 0
+    return 1
+############################################################################################################
+
+############################################################################################################
+# CDB
+############################################################################################################
+#def cdb():
+############################################################################################################
+
+############################################################################################################
+# LOAD/STORE QUEUE
+############################################################################################################
 #def load_store_queue_initialize():
 #    # initialize load/store queue
 #    print "TODO"
-    
+############################################################################################################
+
+############################################################################################################
+# TIMING TABLE
+############################################################################################################ 
+def timing_table_add(PC, instruction, clock_cycle):
+    timing_table_entry = {
+        "PC" : PC,
+        "instruction" : instruction,
+        "issue" : clock_cycle,
+        "ex_start" : 0,
+        "ex_finish" : 0,
+        "mem_start" : 0,
+        "mem_finish" : 0,      
+        "wb" : 0,
+        "commit" : 0
+    }
+    timing_table.append(timing_table_entry.copy())
+    print "TODO"
+
 def timing_table_update():
     # TODO!!!
+    print "TODO"
+def time_table_print():
+    global rs
+    print rs
     print "TODO"
 ############################################################################################################
     
