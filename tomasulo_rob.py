@@ -32,6 +32,13 @@ def rob_instr_add(rob_dest):
     if rob_add_counter <= num_rob_entries:
         rob[rob_add_counter]["destination"] = rob_dest
         rob_add_counter = rob_add_counter + 1; 
+        
+        #update the busy flag
+        rob[rob_add_counter]["destination"] = rob_dest
+        rob[rob_add_counter]["busy"] = "yes"
+        
+        #update the state
+        
     else:
         print "ROB full!"
         return -1
@@ -56,9 +63,17 @@ def rob_check():
 def rob_update_value(dest_tag, rs_value):
 	#use reservation stations to update rob when instructions have completed
     
-    rob_update_index = int(dest_tab.split("ROB")[1])
-    
+    rob_update_index = int(dest_tag.split("ROB")[1])
     rob[rob_update_index]["value"] = rs_value
+    
+def rob_update_state(dest_tag, rs_state):
+	#use reservation stations to update rob state field
+    
+    rob_update_index = int(dest_tag.split("ROB")[1])
+    rob[rob_update_index]["state"] = rs_state
+    
+    
+    
 	
 if __name__ == "__main__":
     instruction_buffer = ["Add.d R1 R2 R3", "Add.d R2 R2 R3", "Add.d R3 R2 R3", "Add.d R4 R2 R3", "Add.d R5 R2 R3"]
