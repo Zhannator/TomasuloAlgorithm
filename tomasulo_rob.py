@@ -44,6 +44,7 @@ def rob_initialize():
     
 def rob_instr_add(rob_dest):
 	#add entry after you fetch instruction
+
     global rob_add_counter
     global num_rob_entries
     
@@ -77,7 +78,6 @@ def rob_update_value(dest_tag, rs_value):
     rob_update_index = int(dest_tab.split("ROB")[1])
     
     rob[rob_update_index]["value"] = rs_value
-	
 	
 	
 	
