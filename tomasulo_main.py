@@ -6,6 +6,7 @@ import tomasulo_rat
 import tomasulo_rs
 import tomasulo_arf
 import tomasulo_mem
+import tomasulo_rob
 
 #
 alu_instructions_int = ["Add", "Addi", "Sub"]
@@ -38,7 +39,7 @@ memory = tomasulo_mem.MEMobject() # 256B(64W), needs its own function on how to 
 arf = tomasulo_arf.ARFobject()
 rat = tomasulo_rat.RATobject()
 rs = tomasulo_rs.RSobject()
-rob = []
+rob = tomasulo_rob.ROBobject()
 load_store_queue = []
 timing_table = [] # needs to be updated during execution time (pc, instruction, column for each stage)
 
@@ -56,7 +57,7 @@ def main(input_filename): # argv is a list of command line arguments
     # initialize rs
     rs.rs_initialize(int_adder_properties["num_rs"], fp_adder_properties["num_rs"], fp_multiplier_properties["num_rs"])
     # initialize rob
-    rob_initialize()
+    rob.rob_initialize(num_rob_entries)
     # initialize load/store queue
     #load_store_queue_initialize() #TODO
     
@@ -213,7 +214,7 @@ def input_file_decoder(input_filename):
         elif(line[0] == "mem"):
             # set memory value
             memory.mem_write(line[1], line[2])
-        else:
+        elif(line_not_split != ""):
             # instruction
             instruction_buffer.append(line_not_split)
 ############################################################################################################
@@ -221,10 +222,6 @@ def input_file_decoder(input_filename):
 ############################################################################################################
 # ROB
 ############################################################################################################
-def rob_initialize():
-    # initialize rob
-    print #TODO
-
 def rob_empty():
     # return 1 if rob is empty, else 0
     return 1
@@ -234,14 +231,6 @@ def rob_empty():
 # CDB
 ############################################################################################################
 #def cdb():
-############################################################################################################
-
-############################################################################################################
-# LOAD/STORE QUEUE
-############################################################################################################
-#def load_store_queue_initialize():
-#    # initialize load/store queue
-#    print "TODO"
 ############################################################################################################
 
 ############################################################################################################
