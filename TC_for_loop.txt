@@ -3,9 +3,9 @@ fp_adder 3 3 1
 fp_multiplier 2 20 1
 load_store_unit 3 1 4 1
 rob_entries 128
-reg R1 3		//for the for loop
-reg R2 0		//initialize i to 0
-reg F1			//A 
+reg R1 3		  //for the for loop
+reg R2 0		  //initialize i to 0
+reg F1 0		  //A 
 reg F2 1.1		//B
 reg F3 2.5		//C
 reg F4 0.0		//D
