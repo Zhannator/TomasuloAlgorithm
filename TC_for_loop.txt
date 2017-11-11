@@ -15,5 +15,6 @@ mem 8 2
 mem 12 3.4
 mult.d F1 F2 F3		//A = B*C
 add.d F4 F1 F5		//D = A + E
+addi R2 R2 1    //increment i
 Bne R1 R2 -12		//check if i=3, if yes then done
 Sd F4 8(R1)			//store D in memory
