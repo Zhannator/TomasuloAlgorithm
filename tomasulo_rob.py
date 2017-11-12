@@ -6,7 +6,7 @@
 class ROBobject:
     rob = []
     rob_check_counter = 0 # rob check counter for checking to see if the top instruction is ready to commit
-    rob_add_counter = 0 # rob pointer for where to add the next instruction in rob buffer
+    rob_add_counter = 0   # rob pointer for where to add the next instruction in rob buffer
 
     def rob_initialize(self, num_rob_entries):
         # initialize rob
@@ -43,15 +43,15 @@ class ROBobject:
         
     def rob_check(self):
         #use busy flag to check if any entries are ready 
-        #use counter for position in rob
+        #use rob_check_counter for pointer to ready inst (must be committed in order)
         
         if self.rob[self.rob_check_counter]["busy"] == "no":
             print "rob" + str(self.rob_check_counter) + "is ready"
+            self.rob_check_counter = self.rob_check_counter + 1
         
         if self.rob_check_counter == len(self.rob):
             self.rob_check_counter = 0
-        else:
-            self.rob_check_counter = self.rob_check_counter + 1
+        
               
     def rob_update_value(self, dest_tag, rs_value):
         #use reservation stations to update rob when instructions have completed
@@ -64,3 +64,5 @@ class ROBobject:
         
         self.rob_update_index = int(dest_tag.split("ROB")[1])
         self.rob[self.rob_update_index]["state"] = rs_state
+        
+        
