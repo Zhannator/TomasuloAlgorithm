@@ -64,7 +64,7 @@ def main(input_filename): # argv is a list of command line arguments
     # initialize rob
     rob.rob_initialize(num_rob_entries)
     # initialize load/store queue
-    #load_store_queue_initialize() #TODO
+    #load_store_queue_initialize()
     
     #-------------------------------------------------
     # Pipeline V1: assume only # ALU Instructions and no dependencies 
@@ -161,38 +161,38 @@ def input_file_decoder(input_filename):
     global instruction_buffer
     input_file = open(input_filename, 'r')
     for line_not_split in input_file:
-        line = line_not_split.split(" ")
-        if(line[0] == "int_adder"):
+        line = line_not_split.upper().split(" ")
+        if(line[0] == "INT_ADDER"):
             # set int_adder_properties
             int_adder_properties["num_rs"] = int(line[1])
             int_adder_properties["cycles_in_ex"] = int(line[2])
             int_adder_properties["num_fus"] = int(line[3])
-        elif(line[0] == "fp_adder"):
+        elif(line[0] == "FP_ADDER"):
             # set fp_adder_properties
             fp_adder_properties["num_rs"] = int(line[1])
             fp_adder_properties["cycles_in_ex"] = int(line[2])
             fp_adder_properties["num_fus"] = int(line[3])
-        elif(line[0] == "fp_multiplier"):
+        elif(line[0] == "FP_MULTIPLIER"):
             # set fp_multiplier_properties
             fp_multiplier_properties["num_rs"] = int(line[1])
             fp_multiplier_properties["cycles_in_ex"] = int(line[2])
             fp_multiplier_properties["num_fus"] = int(line[3])
-        elif(line[0] == "load_store_unit"):
+        elif(line[0] == "LOAD_STORE_UNIT"):
             # set load_store_unit_properties
             load_store_unit_properties["num_rs"] = int(line[1])
             load_store_unit_properties["cycles_in_ex"] = int(line[2])
             load_store_unit_properties["cycles_in_mem"] = int(line[3])
             load_store_unit_properties["num_fus"] = int(line[4])
-        elif(line[0] == "rob_entries"):
+        elif(line[0] == "ROB_ENTRIES"):
             # set num_rob_entries
             num_rob_entries = int(line[1])
-        elif(line[0] == "reg"):
+        elif(line[0] == "REG"):
             # set register value
             arf.reg_write(line[1], line[2])
-        elif(line[0] == "mem"):
+        elif(line[0] == "MEM"):
             # set memory value
             memory.mem_write(line[1], line[2])
-        elif(line_not_split != ""):
+        elif(line_not_split != "" and line[0] != "#"): # if it isn't 
             # instruction
             instruction_buffer.append(line_not_split)
 ############################################################################################################
