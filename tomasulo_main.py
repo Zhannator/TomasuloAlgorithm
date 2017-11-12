@@ -1,18 +1,23 @@
 #!/usr/bin/python
 # -*- coding: utf-8 -*-
 
+# public libraries
 from sys import argv
+import numpy as np
+
+# private libraries
 import tomasulo_rat
 import tomasulo_rs
 import tomasulo_arf
 import tomasulo_mem
 import tomasulo_rob
+import tomasulo_timing_table
 
 #
 alu_instructions_int = ["Add", "Addi", "Sub"]
 alu_instructions_fp = ["Add.d", "Sub.d", "Mult.d"]
 # Global Variables / Defaults
-num_rob_entries = 128 # # of ROB entries
+num_rob_entries = 128 # number of ROB entries
 int_adder_properties = {
     "num_rs" : 2,
     "cycles_in_ex" : 1,
@@ -41,7 +46,7 @@ rat = tomasulo_rat.RATobject()
 rs = tomasulo_rs.RSobject()
 rob = tomasulo_rob.ROBobject()
 load_store_queue = []
-timing_table = [] # needs to be updated during execution time (pc, instruction, column for each stage)
+timing_table = tomasulo_timing_table.TTobject()
 
 ############################################################################################################
 # MAIN
@@ -89,11 +94,13 @@ def main(input_filename): # argv is a list of command line arguments
                 # check int RS
                 i = rs.rs_available("int_adder_rs")
                 if i != -1: # if rs is available
-                    #add instuction
-                    rs.rs_add("int_adder_rs", i, parsed_instruction[0], parsed_instruction[1], parsed_instruction[2], parsed_instruction[3])
-                    # add entry to timing table
-                    timing_table_add(PC, parsed_instruction[0], cycle_counter)
-                    PC = PC + 1
+                    # check if ROB entry is available
+                    if rob.rob_instr_add(instruction_buffer[PC]) != -1:
+                        #add instuction
+                        rs.rs_add("int_adder_rs", i, parsed_instruction[0], parsed_instruction[1], parsed_instruction[2], parsed_instruction[3])
+                        # add entry to timing table
+                        timing_table_add(PC, parsed_instruction[0], cycle_counter)
+                        PC = PC + 1
             elif parsed_instruction[0] in alu_instructions_fp:
                 print "THIS IS A FP ALU INSTRUCTION"
                 rs_name = "fp_adder_rs"
@@ -103,12 +110,12 @@ def main(input_filename): # argv is a list of command line arguments
                 i = rs.rs_available(rs_name)
                 if i != -1: # if rs is available
                     # check if ROB entry is available
-                
-                    #add instuction 
-                    rs.rs_add(rs_name, i, parsed_instruction[0], parsed_instruction[1], parsed_instruction[2], parsed_instruction[3])
-                    # add entry to timing table
-                    timing_table_add(PC, parsed_instruction[0], cycle_counter)
-                    PC = PC + 1
+                    if rob.rob_instr_add(instruction_buffer[PC]) != -1:                   
+                        #add instuction 
+                        rs.rs_add(rs_name, i, parsed_instruction[0], parsed_instruction[1], parsed_instruction[2], parsed_instruction[3])
+                        # add entry to timing table
+                        timing_table_add(PC, parsed_instruction[0], cycle_counter)
+                        PC = PC + 1
                 else:
                     print("RS is full")
                     print("PC: " + str(PC))
@@ -140,35 +147,6 @@ def main(input_filename): # argv is a list of command line arguments
         # when instruction is the oldest in the ROB (ROB head)
             # write result if ready/finished bit is set (memory or register)
         # advance ROB-head to next instruction
-    #-------------------------------------------------
-    
-    #-------------------------------------------------
-    # Simple Pipeline: assume everything stage takes one cycle and no dependencies
-    #-------------------------------------------------
-    #cycle_counter = 0;
-    #pipeline = [-1, -1, -1, -1, -1] # 5 stages: ISSUE(0), EX(1), MEM(2), WB(3), and COMMIT(4)
-    #PC = 0 # in bytes
-
-    #for instruction in instruction_buffer:
-    #    #leaving_instruction = pipeline[4]
-    #    for i in range(4, 0, -1): # 5 stages
-    #        pipeline[i] = pipeline[i-1] # need to accomodate for leaving instructions
-    #    # get new instruction
-    #    pipeline[0] = PC;
-    #    PC = PC + 4;
-    #    cycle_counter = cycle_counter + 1;
-    #    # advance instructions in pipeline
-    #    print ("Current cycle: " + str(cycle_counter))
-    #    print ("Current state: " + str(pipeline))
-    # advance leftover instructions in pipeline
-    #for j in range(0, 5):
-    #    #leaving_instruction = pipeline[4]
-    #    for i in range(4, 0, -1): # 5 stages
-    #        pipeline[i] = pipeline [i-1] # need to accomodate for leaving instructions
-    #    pipeline[0] = -1
-    #    cycle_counter = cycle_counter + 1;
-    #    print ("Current cycle: " + str(cycle_counter))
-    #    print ("Current state: " + str(pipeline))
     #-------------------------------------------------
 ############################################################################################################
 
@@ -220,7 +198,7 @@ def input_file_decoder(input_filename):
 ############################################################################################################
 
 ############################################################################################################
-# ROB
+# ROB TEMPORARY
 ############################################################################################################
 def rob_empty():
     # return 1 if rob is empty, else 0
@@ -228,37 +206,14 @@ def rob_empty():
 ############################################################################################################
 
 ############################################################################################################
-# CDB
+# CDB TEMPORARY
 ############################################################################################################
-#def cdb():
+def cdb():
+    # when value is ready in RS -> broadcast values to ROB, RS
+    # other situations
+    print "CDB TODO"
 ############################################################################################################
 
-############################################################################################################
-# TIMING TABLE
-############################################################################################################ 
-def timing_table_add(PC, instruction, clock_cycle):
-    timing_table_entry = {
-        "PC" : PC,
-        "instruction" : instruction,
-        "issue" : clock_cycle,
-        "ex_start" : 0,
-        "ex_finish" : 0,
-        "mem_start" : 0,
-        "mem_finish" : 0,      
-        "wb" : 0,
-        "commit" : 0
-    }
-    timing_table.append(timing_table_entry.copy())
-    print "TODO"
-
-def timing_table_update():
-    # TODO!!!
-    print "TODO"
-def time_table_print():
-    print rs.rs
-    print "TODO"
-############################################################################################################
-    
 if __name__ == "__main__":
     if len(argv) > 1:
         main(argv[1]) # python2.7 tomasulo_main.py input_file.txt
