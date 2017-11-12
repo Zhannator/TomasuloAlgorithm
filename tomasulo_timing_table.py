@@ -32,6 +32,6 @@ class TTobject:
         row_format ="{:^16}" * len(column_names)
         print row_format.format(*column_names)
         for tt_entry in self.timing_table:
-            tt_entry_list = np.array([tt_entry["PC"], tt_entry["instruction"], tt_entry["issue"], tt_entry["ex_start"], tt_entry["ex_finish"], tt_entry["mem_start"], tt_entry["mem_finish"], tt_entry["wb"], tt_entry["commit_start"], tt_entry["commit_finish"]])
+            tt_entry_list = [tt_entry["PC"], tt_entry["instruction"], tt_entry["issue"], tt_entry["ex_start"], tt_entry["ex_finish"], tt_entry["mem_start"], tt_entry["mem_finish"], tt_entry["wb"], tt_entry["commit_start"], tt_entry["commit_finish"]]
             print row_format.format(*tt_entry_list)
         print
