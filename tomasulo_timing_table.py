@@ -25,13 +25,13 @@ class TTobject:
         print "TIMING TABLE UPDATE TODO"
         
     def time_table_print(self):
-        print "########################################################################################################################################################"
-        print "{:^152}".format("TIMING TABLE")
-        print "########################################################################################################################################################"    
+        print "###############################################################################################################################################################"
+        print "{:^159}".format("TIMING TABLE")
+        print "###############################################################################################################################################################"    
         column_names = [ "PC", "INSTRUCTION", "ISSUE", "EX_S", "EX_F", "MEM_S", "MEM_F", "WB", "COMMIT_S", "COMMIT_F"]
-        row_format ="{:^15}" * len(column_names)
+        row_format ="{:^16}" * len(column_names)
         print row_format.format(*column_names)
         for tt_entry in self.timing_table:
             tt_entry_list = np.array([tt_entry["PC"], tt_entry["instruction"], tt_entry["issue"], tt_entry["ex_start"], tt_entry["ex_finish"], tt_entry["mem_start"], tt_entry["mem_finish"], tt_entry["wb"], tt_entry["commit_start"], tt_entry["commit_finish"]])
             print row_format.format(*tt_entry_list)
-        print "########################################################################################################################################################"    
+        print
