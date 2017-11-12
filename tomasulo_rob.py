@@ -20,7 +20,7 @@ class ROBobject:
         
         for i in range(num_rob_entries):
             self.rob.append(rob_entry.copy())
-        
+    
     def rob_instr_add(self, instruction):
         #add entry after you fetch instruction
         
@@ -40,8 +40,11 @@ class ROBobject:
             return -1
         print rob
         print
+    
+    def rob_available(self):
         
-    def rob_check(self):
+        
+    def rob_check_if_ready(self):
         #use busy flag to check if any entries are ready 
         #use rob_check_counter for pointer to ready inst (must be committed in order)
         
