@@ -5,7 +5,7 @@ fp_multiplier 2 20 1
 # FU_name #_of_rs cycles_in_EX cycles_in_mem #_of_FUs
 load_store_unit 3 1 4 1
 # rob_entries #_of_rob_entries
-rob_entries 128
+rob_entries 10
 # reg reg_name reg_value
 reg R1 10
 reg R2 20
@@ -16,5 +16,5 @@ mem 8 2
 mem 12 3.4
 # instructions
 Add.d F1 F2 F3
-Ld F4 8(R1)
-Bne R2 R3 -3
+Add R2 R1 R0
+Mult.d F4 F2 F3

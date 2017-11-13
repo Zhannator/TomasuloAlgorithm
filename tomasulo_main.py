@@ -38,7 +38,7 @@ load_store_unit_properties = {
 }
 
 # GLOBAL STRUCTURES
-instruction_buffer = ["Add.d R1, R2, R3", "Add.d R1, R2, R3", "Add.d R1, R2, R3", "Add.d R1, R2, R3", "Add.d R1, R2, R3"]
+instruction_buffer = []
 memory = tomasulo_mem.MEMobject() # 256B(64W), needs its own function on how to reference locations in mem by word/byte
 arf = tomasulo_arf.ARFobject()
 rat = tomasulo_rat.RATobject()
@@ -49,14 +49,9 @@ load_store_queue = []
 
 # GLOBAL CONTROL LOGIC SIGNALS (DEFAULTS ARE 0)
 available_int_fu = 0
-cycle_counter = 0
+
 memory_will_be_in_use_next_cycle = 0
 cdb_will_be_in_use_next_cycle = 0
-PC = 0 # instruction buffer index, incremented by 4
-
-# NOT SURE IF NEEDED
-alu_instructions_int = ["Add", "Addi", "Sub"]
-alu_instructions_fp = ["Add.d", "Sub.d", "Mult.d"]
 
 ############################################################################################################
 # MAIN
@@ -87,9 +82,11 @@ def main(input_filename): # argv is a list of command line arguments
     #-------------------------------------------------
     
     # each loop run is a new cycle, exits when all the instructions exitited pipeline and instruction buffer has been used up
+    PC = 0 # instruction buffer index, incremented by 4
+    cycle_counter = 0
     while(1):
         # print results and exit if rob is empty and instruction_buffer is exerted
-        if rob_empty() and ((PC/4) > len(instruction_buffer)):
+        if rob.rob_empty() and ((PC/4) > len(instruction_buffer)):
             timing_table.time_table_print()
             arf.arf_print()
             memory.mem_print_non_zero_values()
@@ -99,51 +96,66 @@ def main(input_filename): # argv is a list of command line arguments
         cycle_counter = cycle_counter + 1
         
         # can_issue_new_instuction = (available_instuction_in_instruction_buffer) & (available_rob_entry) &  (available_rs_entry)
-        available_instuction_in_instruction_buffer = ((PC/4) > len(instruction_buffer))
-        print "available_instuction_in_instruction_buffer: " + available_instuction_in_instruction_buffer
-        available_rob_entry = rob_available()
-        print "available_rob_entry: " + available_rob_entry
+        available_instuction_in_instruction_buffer = ((PC/4) < len(instruction_buffer))
+        print "available_instuction_in_instruction_buffer: " + str(available_instuction_in_instruction_buffer)
+        available_rob_entry = (rob.rob_available() == 1)
+        print "available_rob_entry: " + str(available_rob_entry)
         if available_instuction_in_instruction_buffer and available_rob_entry:
             # get insturction
             instruction = instruction_buffer[(PC/4)]
+            print "instruction: " + instruction
             instruction_parsed = instruction.split(" ")
-            instructin_id = instruction_parsed[0]
+            instruction_id = instruction_parsed[0]
             # check if there is an available rs entry based on instruction op
-            rs_index = 0
-
-# send the operands to the reservation station if they are available in either the registers or the ROB
-# Update the control entries to indicate the buffers are in use
-# number of the ROB entry allocated for the result is also sent to the reservation station, so that the number can be used to tag the result when it is placed
-# If either all reservations are full or the ROB is full, then instruction issue is stalled until both have available entries.
-            
-            if instructin_id in ["ADD", "ADDI", "SUB"]: # check int_adder_rs
-                rs_index = rs.rs_available["int_adder_rs"]
+            rs_index = 0          
+            if instruction_id in ["ADD", "ADDI", "SUB"]: # check int_adder_rs
+                rs_index = rs.rs_available("int_adder_rs")
                 available_rs_entry = (rs_index != -1)
                 if available_rs_entry:
                     # add entry
                     # check if we have values of qj and qk
-                    get_current_reg_info(instruction_parsed[2]) # reg_name
-                    get_current_reg_info(instruction_parsed[3]) # reg_name
-                    rs.rs_add() # rs_name, rs_index, op, dest, qj, qk
-            elif instructin_id in ["ADD.D", "SUB.D"]: # check fp_adder_rs
-                rs_index = rs.rs_available["fp_adder_rs"]
+                    reg1 = get_current_reg_info(instruction_parsed[2]) # reg_name
+                    reg2 = get_current_reg_info(instruction_parsed[3]) # reg_name
+                    rob_dest = rob.rob_instr_add(instruction)
+                    rs.rs_add("int_adder_rs", rs_index, instruction_id, rob_dest, reg1[0], reg2[0], reg1[1], reg2[1]) # rs_name, i, op, dest, vj, vk, qj, qk
+                    PC = PC + 4
+            elif instruction_id in ["ADD.D", "SUB.D"]: # check fp_adder_rs
+                rs_index = rs.rs_available("fp_adder_rs")
                 available_rs_entry = (rs_index != -1)
                 if available_rs_entry:
                     # add entry
+                    # check if we have values of qj and qk
+                    reg1 = get_current_reg_info(instruction_parsed[2]) # reg_name
+                    reg2 = get_current_reg_info(instruction_parsed[3]) # reg_name
+                    rob_dest = rob.rob_instr_add(instruction)
+                    rs.rs_add("fp_adder_rs", rs_index, instruction_id, rob_dest, reg1[0], reg2[0], reg1[1], reg2[1]) # rs_name, i, op, dest, vj, vk, qj, qk
+                    PC = PC + 4
             elif instruction_id in ["MULT.D"]: # check fp_multiplier_rs
-                rs_index = rs.rs_available["fp_multiplier_rs"]
+                rs_index = rs.rs_available("fp_multiplier_rs")
                 available_rs_entry = (rs_index != -1)
                 if available_rs_entry:
                     # add entry
-            elif instructin_id in ["LD", "SD"]:
+                    #check if we have values of qj and qk
+                    reg1 = get_current_reg_info(instruction_parsed[2]) # reg_name
+                    reg2 = get_current_reg_info(instruction_parsed[3]) # reg_name
+                    rob_dest = rob.rob_instr_add(instruction)
+                    rs.rs_add("fp_multiplier_rs", rs_index, instruction_id, rob_dest, reg1[0], reg2[0], reg1[1], reg2[1]) # rs_name, i, op, dest, vj, vk, qj, qk
+                    PC = PC + 4
+            elif instruction_id in ["LD", "SD"]:
                 print "HANDLE LD AND SD TODO"
-            elif instructin_id in ["BEQ", "BNE"]:
+            elif instruction_id in ["BEQ", "BNE"]:
                 print "HANDLE BEQ AND BNE TODO"
             else:
                 print "Invalid instuction!"
                 exit(1)
-            
-            
+
+        if PC == 12:
+            print "END TEST"
+            print
+            rob.rob_print()
+            print
+            rs.rs_print()
+            exit(0)
         
     #-------------------------------------------------
 ############################################################################################################
@@ -159,6 +171,7 @@ def input_file_decoder(input_filename):
     global instruction_buffer
     input_file = open(input_filename, 'r')
     for line_not_split in input_file:
+        line_not_split = line_not_split.upper().split("\n")[0]
         line = line_not_split.upper().split(" ")
         if(line[0] == "INT_ADDER"):
             # set int_adder_properties
@@ -235,32 +248,27 @@ def control_logic():
 ############################################################################################################
 # EXTRA FUNCTIONS
 ############################################################################################################
-def get_current_reg_info_(reg_name): # returns v and q
+def get_current_reg_info(reg_name): # returns [v, q]
     # get the operands if they are available in either the registers or the ROB
     
     # check RAT
-    reg_value = rat.int_rat_get(reg_name)
-
+    if reg_name.startswith("R"):
+        reg_value = rat.int_rat_get(reg_name)
+    else:
+        reg_value = rat.fp_rat_get(reg_name)
+        
     if reg_value.startswith("ROB"): # if ROB -> 
-        index = int(int_reg.split("ROB")[1])
-        # if ROB# value is ready -> pull value from ROB
-        # if ROB# value not ready -> return ROB name
+        rob_entry_value = rob.rob_get_value(reg_value)
+        if str(rob_entry_value) == "-": # if ROB# value is ready -> pull value from ROB
+            return ["-", reg_value]
+        else: # if ROB# value not ready -> return ROB name
+            return [rob_entry_value, "-"]    
     else: # if R or F -> 
         # pull value from ARFobject
-        return [reg_read(reg_value), "-"]
+        return [arf.reg_read(reg_value), "-"]
     
     print "GET CURRENT REG INFO TODO"
     
-############################################################################################################
-############################################################################################################
-# ROB TEMPORARY
-############################################################################################################
-def rob_empty():
-    # return 1 if rob is empty, else 0
-    return 1
-def rob_available():
-    # return 1 if rob has an available entry
-    return 1
 ############################################################################################################
 
 ############################################################################################################
