@@ -51,15 +51,6 @@ load_store_queue = [] # doesn't need to be initialized
 # MAIN
 ############################################################################################################		
 def main(input_filename): # argv is a list of command line arguments
-    # GLOBAL CONTROL LOGIC SIGNALS (DEFAULTS ARE 0)
-    available_int_fu = 0
-    timing_table_entry_index = 0
-    memory_is_in_use = 0 # will be incremented by cycles_in_mem and decremented by 1's
-    memory_buffer = [] # [address, value]
-    cdb_in_use = 0 # will be 1 or 0
-    commit_in_use = 0 # will be 1 or 0
-    arf_buffer = []
-    
     #-------------------------------------------------
     # Structures and Parameters Initialization
     #-------------------------------------------------
@@ -80,6 +71,14 @@ def main(input_filename): # argv is a list of command line arguments
     # initialize load/store queue
     #load_store_queue.load_store_queue_initialize()
     
+    # GLOBAL CONTROL LOGIC SIGNALS
+    available_int_fu = fp_adder_properties["num_fus"] # decremented if someone starts using it, incremented if someone exits ex stage; if 0 - > no fu available
+    timing_table_entry_index = 0
+    memory_is_in_use = 0 # will be incremented by cycles_in_mem and decremented by 1's
+    memory_buffer = [] # [address, value]
+    cdb_in_use = 0 # will be 1 or 0
+    commit_in_use = 0 # will be 1 or 0
+    arf_buffer = []
     
     #-------------------------------------------------
     # PIPELINE V1: assume only # ALU Instructions and no dependencies 
@@ -95,10 +94,14 @@ def main(input_filename): # argv is a list of command line arguments
             arf.arf_print()
             memory.mem_print_non_zero_values()
             exit(0)
-            
-        # INCREMENT CYCLE
+		
+		# INCREMENT CYCLE
         cycle_counter = cycle_counter + 1
-        
+
+        # RESET number of available fp fus
+        available_fp_adder_fu = fp_adder_properties["num_fus"] # fp fus are pipelined, this number corresponds to how many fp adder instructions can be moved to ex stage in the same cycle; incremented when
+        available_fp_mult_fu = fp_multiplier_properties["num_fus"] # fp fus are pipelined, this number corresponds to how many fp mult instructions can be moved to ex stage in the same cycle
+		
         # UPDATE MEMORY USAGE
         if memory_is_in_use != 0:
             memory_is_in_use = memory_is_in_use - 1
@@ -137,11 +140,9 @@ def main(input_filename): # argv is a list of command line arguments
             print "instruction: " + instruction
             instruction_parsed = instruction.split(" ")
             instruction_id = instruction_parsed[0]
-            # check if there is an available rs entry based on instruction op
-            rs_index = 0          
+            # check if there is an available rs entry based on instruction op       
             if instruction_id in ["ADD", "ADDI", "SUB", "BEQ", "BNE"]: # check int_adder_rs
-                rs_index = rs.rs_available("int_adder_rs")
-                available_rs_entry = (rs_index != -1)
+                available_rs_entry = (rs.rs_available("int_adder_rs") != -1)
                 if available_rs_entry:
                     # add entry
                     # check if we have values of qj and qk
@@ -157,12 +158,11 @@ def main(input_filename): # argv is a list of command line arguments
                         rob_dest = rob.rob_instr_add(instruction, instruction_parsed[1], timing_table_entry_index)
                         rat.int_rat_update(instruction_parsed[1], rob_dest) # need to update rat
                     timing_table_entry_index = timing_table_entry_index + 1
-                    rs.rs_add("int_adder_rs", rs_index, instruction_id, rob_dest, reg1[0], reg2[0], reg1[1], reg2[1]) # rs_name, i, op, dest, vj, vk, qj, qk
+                    rs.rs_add("int_adder_rs", instruction_id, rob_dest, reg1[0], reg2[0], reg1[1], reg2[1]) # rs_name, i, op, dest, vj, vk, qj, qk
                     timing_table.timing_table_add(PC, instruction, cycle_counter)
                     PC = PC + 4
             elif instruction_id in ["ADD.D", "SUB.D"]: # check fp_adder_rs
-                rs_index = rs.rs_available("fp_adder_rs")
-                available_rs_entry = (rs_index != -1)
+                available_rs_entry = (rs.rs_available("fp_adder_rs") != -1)
                 if available_rs_entry:
                     # add entry
                     # check if we have values of qj and qk
@@ -171,12 +171,11 @@ def main(input_filename): # argv is a list of command line arguments
                     rob_dest = rob.rob_instr_add(instruction, instruction_parsed[1], timing_table_entry_index)
                     rat.fp_rat_update(instruction_parsed[1], rob_dest) # need to update rat
                     timing_table_entry_index = timing_table_entry_index + 1
-                    rs.rs_add("fp_adder_rs", rs_index, instruction_id, rob_dest, reg1[0], reg2[0], reg1[1], reg2[1]) # rs_name, i, op, dest, vj, vk, qj, qk
+                    rs.rs_add("fp_adder_rs", instruction_id, rob_dest, reg1[0], reg2[0], reg1[1], reg2[1]) # rs_name, i, op, dest, vj, vk, qj, qk
                     timing_table.timing_table_add(PC, instruction, cycle_counter)
                     PC = PC + 4
             elif instruction_id in ["MULT.D"]: # check fp_multiplier_rs
-                rs_index = rs.rs_available("fp_multiplier_rs")
-                available_rs_entry = (rs_index != -1)
+                available_rs_entry = (rs.rs_available("fp_multiplier_rs") != -1)
                 if available_rs_entry:
                     # add entry
                     #check if we have values of qj and qk
@@ -185,7 +184,7 @@ def main(input_filename): # argv is a list of command line arguments
                     rob_dest = rob.rob_instr_add(instruction, instruction_parsed[1], timing_table_entry_index)
                     rat.fp_rat_update(instruction_parsed[1], rob_dest) # need to update rat
                     timing_table_entry_index = timing_table_entry_index + 1
-                    rs.rs_add("fp_multiplier_rs", rs_index, instruction_id, rob_dest, reg1[0], reg2[0], reg1[1], reg2[1]) # rs_name, i, op, dest, vj, vk, qj, qk
+                    rs.rs_add("fp_multiplier_rs", instruction_id, rob_dest, reg1[0], reg2[0], reg1[1], reg2[1]) # rs_name, i, op, dest, vj, vk, qj, qk
                     timing_table.timing_table_add(PC, instruction, cycle_counter)
                     PC = PC + 4
             elif instruction_id in ["LD", "SD"]:
@@ -198,7 +197,7 @@ def main(input_filename): # argv is a list of command line arguments
         rob_entry = rob.rob_head_node() 
         while rob_entry != -1:
             rob_entry_state = rob.rob_get_state(rob_entry)
-            rob_entry_instruction_id = rob_get_instruction_id(rob_entry)
+            rob_entry_instruction_id = rob.rob_get_instruction_id(rob_entry)
             if rob_entry_state == "WB":
                 #---------------------------------------------------------------------
                 # WB -> COMMIT STAGE
@@ -228,37 +227,113 @@ def main(input_filename): # argv is a list of command line arguments
                 # MEM -> WB
                 #---------------------------------------------------------------------
                 #can_move_from_mem_to_wb_stage = (forwarding_flag_set) & ((cycle_counter-mem_s) == 1)  & (!cdb_will_be_in_use_next_cycle) or (!forwarding_flag_set) & ((cycle_counter-mem_s) == fu_mem_cycles) & (!cdb_will_be_in_use_next_cycle)
-
+				print "TODO"
             elif rob_entry_state == "EX" and rob_entry_instruction_id == "LD":  
                 #---------------------------------------------------------------------
                 # EX -> MEM
                 #---------------------------------------------------------------------
                 #can_move_from_ex_to_mem_stage = (ld_instuction) & ((cycle_counter-ex_s) == fu_execution_cycles) & (!memory_will_be_in_use_next_cycle)
-                
+                print "TODO"
             elif rob_entry_state == "EX" and rob_entry_instruction_id != "LD":    
                 #---------------------------------------------------------------------
                 # EX -> WB STAGE
                 #---------------------------------------------------------------------            
                 #can_move_from_ex_to_wb_stage = (!ld_instuction) & ((cycle_counter-ex_s) == fu_execution_cycles) & (!cdb_will_be_in_use_next_cycle)
                 
+				#if used int adder -> increment available_int_fu
+				print "TODO"
             elif rob_entry_state == "ISSUE":    
                 #---------------------------------------------------------------------
                 # ISSUE -> EX
                 #---------------------------------------------------------------------            
                 #can_move_to_ex_stage = (alu_int_instruction) & (no_register_dependencies) & (available_int_fu) or (!alu_int_instruction) & (no_register_dependencies)
-                if rob_entry_instruction_id == "ADD"
+                if rob_entry_instruction_id == "ADD":
+                    # find rs entry (by using ROB entry name)
+                    no_dependencies = (rs.rs_no_dependencies("int_adder_rs", rob_entry) != -1)
+                    if no_dependencies and available_int_fu != 0:
+                        # decrement available_int_fu
+                        available_int_fu = available_int_fu - 1
+                        # perform addition
+                        result = rs.rs_get_values("int_adder_rs", rob_entry)
+                        # add result to register buffer
+                        print "TODO"
+                        #update stage info in rob
+                        rob.rob_update_state(rob_entry, "EX")
+                        #update stage infor in tt
+                        timing_table.timing_table_update(rob.rob_get_tt_index(rob_entry), "EX", cycle_counter, (cycle_counter + int_adder_properties["cycles_in_ex"]-1))
                 elif rob_entry_instruction_id == "ADDI":
+					# find rs entry (by using ROB entry name)
+                    no_dependencies = (rs.rs_no_dependencies("int_adder_rs", rob_entry) != -1)
+                    if no_dependencies and available_int_fu != 0:
+						# decrement available_int_fu
+						# perform addition
+						# add result to register buffer
+						print "TODO"
                 elif rob_entry_instruction_id == "SUB":
+					# find rs entry (by using ROB entry name)
+                    no_dependencies = (rs.rs_no_dependencies("int_adder_rs", rob_entry) != -1)
+                    if no_dependencies and available_int_fu != 0:
+						# decrement available_int_fu
+						# perform subtraction
+						# add result to register buffer
+						print "TODO"
                 elif rob_entry_instruction_id == "ADD.D":
+					# find rs entry (by using ROB entry name)
+                    no_dependencies = (rs.rs_no_dependencies("int_adder_rs", rob_entry) != -1)
+                    if no_dependencies and available_fp_adder_fu != 0:
+						# decrement available_fp_adder_fu
+						# perform addition
+						# add result to register buffer
+						print "TODO"
                 elif rob_entry_instruction_id == "SUB.D":
+					# find rs entry (by using ROB entry name)
+                    no_dependencies = (rs.rs_no_dependencies("int_adder_rs", rob_entry) != -1)
+                    if no_dependencies and available_fp_adder_fu != 0:
+						# decrement available_fp_adder_fu
+						# perform subtraction
+						# add result to register buffer
+						print "TODO"
                 elif rob_entry_instruction_id == "MULT.D":
+					# find rs entry (by using ROB entry name)
+                    no_dependencies = (rs.rs_no_dependencies("int_adder_rs", rob_entry) != -1)
+                    if no_dependencies and available_fp_mult_fu != 0:
+						# decrement available_fp_mult_fu
+						# perform multiplication
+						# add result to register buffer
+						print "TODO"
                 elif rob_entry_instruction_id == "BEQ": # resolve branch using int adder
+					# find rs entry (by using ROB entry name)
+                    no_dependencies = (rs.rs_no_dependencies("int_adder_rs", rob_entry) != -1)
+                    if no_dependencies and available_int_fu != 0:
+						# decrement available_int_fu
+						# perform subtraction
+						# what to do with result
+						print "TODO"
                 elif rob_entry_instruction_id == "BNE": # resolve branch using int adder
+					# find rs entry (by using ROB entry name)
+                    no_dependencies = (rs.rs_no_dependencies("int_adder_rs", rob_entry) != -1)
+                    if no_dependencies and available_int_fu != 0:
+						# decrement available_int_fu
+						# perform subtraction
+						# what to do with result
+						print "TODO"
                 elif instruction_id in ["SD", "LD"]: # calculate address
-            
-                
-            
-            rob_entry = rob.next(rob_entry, rob_dest)
+                    no_dependencies = (rs.rs_no_dependencies("int_adder_rs", rob_entry) != -1)
+                    if no_dependencies:
+						# calculate address
+						# what to do with calculated address
+						print "TODO"
+                        
+            if cycle_counter == 4:
+                print "EXITING..."
+                rob.rob_print()
+                rs.rs_print()
+                timing_table.time_table_print()
+                memory.mem_print_non_zero_values()
+                arf.arf_print()
+                exit(0)
+				
+            rob_entry = rob.rob_next(rob_entry, rob_dest)
             
     
     rob.rob_print()

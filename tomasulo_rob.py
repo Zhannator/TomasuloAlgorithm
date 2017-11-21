@@ -120,6 +120,7 @@ class ROBobject:
         if self.rob_check_counter == self.rob_add_counter: #returns -1 if there ROB is empty
             return -1
         else:
+            print "ROB" + str(self.rob_check_counter)
             return "ROB" + str(self.rob_check_counter)
         
     def rob_next(self, rob_entry, instruction_issue_indicator):
@@ -145,10 +146,10 @@ class ROBobject:
         print "###############################################################################################################################################################"
         print "{:^159}".format("ROB")
         print "###############################################################################################################################################################"    
-        column_names = ["BUSY", "INSTRUCTION", "STATE", "DESTINATION", "VALUE"]
+        column_names = ["", "BUSY", "INSTRUCTION", "STATE", "DESTINATION", "VALUE"]
         row_format ="{:^16}" * len(column_names)
         print row_format.format(*column_names)
-        for rob_entry in self.rob:
-            rob_entry_list = [rob_entry["busy"], rob_entry["instruction"], rob_entry["state"], rob_entry["destination"], rob_entry["value"]]
+        for index, rob_entry in enumerate(self.rob):
+            rob_entry_list = ["ROB"+str(index), rob_entry["busy"], rob_entry["instruction"], rob_entry["state"], rob_entry["destination"], rob_entry["value"]]
             print row_format.format(*rob_entry_list)
         print   

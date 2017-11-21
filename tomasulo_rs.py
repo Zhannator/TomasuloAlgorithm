@@ -9,54 +9,73 @@ class RSobject:
         "fp_adder_rs" : [],
         "fp_multiplier_rs" : []
     }
+    int_adder_rs_size = 0
+    fp_adder_rs_size = 0
+    fp_multiplier_rs_size = 0
+    rs_entry = {
+		"busy" : "no",
+		"op" : "-",
+		"dest" : "-",
+		"vj" : "-",
+		"vk" : "-",
+		"qj" : "-",
+		"qk" : "-"
+	}
+	
+	#self.rs["int_adder_rs"].append(self.rs_entry.copy())
+	#self.rs["fp_adder_rs"].append(self.rs_entry.copy())
     
     def rs_initialize(self, int_adder_num_rs, fp_adder_num_rs, fp_multiplier_num_rs):
         # initialize rs based on configs of FUs
-        rs_entry = {
-            "busy" : "no",
-            "op" : "-",
-            "dest" : "-",
-            "vj" : "-",
-            "vk" : "-",
-            "qj" : "-",
-            "qk" : "-"
-        }
-        for i in range(int_adder_num_rs):  
-            self.rs["int_adder_rs"].append(rs_entry.copy())
-        for i in range(fp_adder_num_rs):  
-            self.rs["fp_adder_rs"].append(rs_entry.copy())
-        for i in range(fp_multiplier_num_rs):  
-            self.rs["fp_multiplier_rs"].append(rs_entry.copy())
+        self.int_adder_rs_size = int_adder_num_rs
+        self.fp_adder_rs_size = fp_adder_num_rs
+        self.fp_multiplier_rs_size = fp_multiplier_num_rs
 
     def rs_available(self, rs_name):
-        # check rs to see if there is an open station, if yes - return index, if no, return -1
-        for i, station in enumerate(self.rs[rs_name]):
-            if station["op"] == "-":
-                return i
+        # check rs to see if there is an open station, if yes - return 1, if no, return -1
+        if (rs_name == "int_adder_rs" and len(self.rs[rs_name]) < self.int_adder_rs_size) or (rs_name == "fp_adder_rs" and len(self.rs[rs_name]) < self.fp_adder_rs_size) or (rs_name == "fp_multiplier_rs" and len(self.rs[rs_name]) < self.fp_multiplier_rs_size):
+            return 1
         return -1
         
-    def rs_add(self, rs_name, i, op, dest, vj, vk, qj, qk):
-        # add rs entry at index
-        self.rs[rs_name][i]["op"] = op
-        self.rs[rs_name][i]["dest"] = dest
-        self.rs[rs_name][i]["vj"] = vj
-        self.rs[rs_name][i]["vk"] = vk
-        self.rs[rs_name][i]["qj"] = qj
-        self.rs[rs_name][i]["qk"] = qk
-        if vj != "-" and vk != "-":
-            self.rs[rs_name][i]["busy"] = "no"
+    def rs_add(self, rs_name, op, dest, vj, vk, qj, qk):
+        # add rs entry
+        if (rs_name == "int_adder_rs" and len(self.rs[rs_name]) < self.int_adder_rs_size) or (rs_name == "fp_adder_rs" and len(self.rs[rs_name]) < self.fp_adder_rs_size) or (rs_name == "fp_multiplier_rs" and len(self.rs[rs_name]) < self.fp_multiplier_rs_size):
+            if vj != "-" and vk != "-":
+                busy = "no"
+            else:
+                busy = "yes"
+            rs_entry = {
+                "busy" : busy,
+                "op" : op,
+                "dest" : dest,
+                "vj" : vj,
+                "vk" : vk,
+                "qj" : qj,
+                "qk" : qk
+            }
+            self.rs[rs_name].append(rs_entry.copy())
         else:
-            self.rs[rs_name][i]["busy"] = "yes"
-    
+            return -1
+            
+    def rs_no_dependencies(self, rs_name, rob_entry):
+		#returns 1 if all the values are ready and the instruction is ready to execute
+		for rs_entry in self.rs[rs_name]:
+			if rs_entry["dest"] == rob_entry:
+				if rs_entry["busy"] == "no":
+					return 1
+				else:
+					return -1
+		return -1
+	
     def rs_update_value():
         print "RS UPDATE VALUE TODO"
         
-    def rs_get_values():
-        print "RS GET VALUE TODO"
-    
-    def rs_ready_to_execute(self):
-        # if busy == "no"
-        print "RS READY TO EX TODO"
+    def rs_get_values(self, rs_name, rob_entry):
+		#returns [vj, vk]
+		for rs_entry in self.rs[rs_name]:
+			if rs_entry["dest"] == rob_entry:
+				return [rs_entry["vj"], rs_entry["vk"]]
+		return -1		
         
     def rs_print(self):
         print "###############################################################################################################################################################"

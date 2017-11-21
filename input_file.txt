@@ -1,5 +1,5 @@
 # FU_name #_of_rs cycles_in_EX #_of_FUs
-int_adder 2 1 1
+int_adder 2 1 2
 fp_adder 3 3 1
 fp_multiplier 2 20 1
 # FU_name #_of_rs cycles_in_EX cycles_in_mem #_of_FUs

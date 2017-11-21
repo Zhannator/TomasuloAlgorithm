@@ -23,10 +23,10 @@ class TTobject:
 
     def timing_table_update(self, tt_entry_index, state, current_cycle, num_of_op_cycles):
         if state == "MEM" or state == "EX" or state == "COMMIT":
-            self.timing_table[tt_entry_index][state + "_START"] = cycle
-            self.timing_table[tt_entry_index][state + "_FINISH"] = cycle + num_of_op_cycles - 1
+            self.timing_table[tt_entry_index][state + "_START"] = current_cycle
+            self.timing_table[tt_entry_index][state + "_FINISH"] = current_cycle + num_of_op_cycles - 1
         else:
-            self.timing_table[tt_entry_index][state] = cycle
+            self.timing_table[tt_entry_index][state] = current_cycle
         
     def time_table_print(self):
         print "###############################################################################################################################################################"
