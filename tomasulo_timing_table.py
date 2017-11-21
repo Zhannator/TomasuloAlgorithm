@@ -10,19 +10,23 @@ class TTobject:
         timing_table_entry = {
             "PC" : PC,
             "instruction" : instruction,
-            "issue" : clock_cycle,
-            "ex_start" : "-",
-            "ex_finish" : "-",
-            "mem_start" : "-",
-            "mem_finish" : "-",      
-            "wb" : "-",
-            "commit_start" : "-",
-            "commit_finish" : "-"
+            "ISSUE" : clock_cycle,
+            "EX_START" : "-",
+            "EX_FINISH" : "-",
+            "MEM_START" : "-",
+            "MEM_FINISH" : "-",      
+            "WB" : "-",
+            "COMMIT_START" : "-",
+            "COMMIT_FINISH" : "-"
         }
         self.timing_table.append(timing_table_entry.copy())
 
-    def timing_table_update(self):
-        print "TIMING TABLE UPDATE TODO"
+    def timing_table_update(self, tt_entry_index, state, current_cycle, num_of_op_cycles):
+        if state == "MEM" or state == "EX" or state == "COMMIT":
+            self.timing_table[tt_entry_index][state + "_START"] = cycle
+            self.timing_table[tt_entry_index][state + "_FINISH"] = cycle + num_of_op_cycles - 1
+        else:
+            self.timing_table[tt_entry_index][state] = cycle
         
     def time_table_print(self):
         print "###############################################################################################################################################################"
@@ -32,6 +36,6 @@ class TTobject:
         row_format ="{:^16}" * len(column_names)
         print row_format.format(*column_names)
         for tt_entry in self.timing_table:
-            tt_entry_list = [tt_entry["PC"], tt_entry["instruction"], tt_entry["issue"], tt_entry["ex_start"], tt_entry["ex_finish"], tt_entry["mem_start"], tt_entry["mem_finish"], tt_entry["wb"], tt_entry["commit_start"], tt_entry["commit_finish"]]
+            tt_entry_list = [tt_entry["PC"], tt_entry["instruction"], tt_entry["ISSUE"], tt_entry["EX_START"], tt_entry["EX_FINISH"], tt_entry["MEM_START"], tt_entry["MEM_FINISH"], tt_entry["WB"], tt_entry["COMMIT_START"], tt_entry["COMMIT_FINISH"]]
             print row_format.format(*tt_entry_list)
         print

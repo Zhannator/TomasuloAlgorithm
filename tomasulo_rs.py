@@ -31,7 +31,7 @@ class RSobject:
     def rs_available(self, rs_name):
         # check rs to see if there is an open station, if yes - return index, if no, return -1
         for i, station in enumerate(self.rs[rs_name]):
-            if station["busy"] == "no":
+            if station["op"] == "-":
                 return i
         return -1
         
