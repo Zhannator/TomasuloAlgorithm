@@ -97,6 +97,7 @@ def main(input_filename): # argv is a list of command line arguments
 		
 		# INCREMENT CYCLE
         cycle_counter = cycle_counter + 1
+        print "CYCLE: " + str(cycle_counter)
 
         # RESET number of available fp fus
         available_fp_adder_fu = fp_adder_properties["num_fus"] # fp fus are pipelined, this number corresponds to how many fp adder instructions can be moved to ex stage in the same cycle; incremented when
@@ -154,7 +155,10 @@ def main(input_filename): # argv is a list of command line arguments
                         rat.int_rat_update(instruction_parsed[1], rob_dest) # need to update rat
                     else:
                         reg1 = get_current_reg_info(instruction_parsed[2]) # reg_name
-                        reg2 = get_current_reg_info(instruction_parsed[3]) # reg_name
+                        if instruction_id in ["ADDI"]:
+                            reg2 = [int(instruction_parsed[3]), "-"]
+                        else:
+                            reg2 = get_current_reg_info(instruction_parsed[3]) # reg_name
                         rob_dest = rob.rob_instr_add(instruction, instruction_parsed[1], timing_table_entry_index)
                         rat.int_rat_update(instruction_parsed[1], rob_dest) # need to update rat
                     timing_table_entry_index = timing_table_entry_index + 1
@@ -194,8 +198,9 @@ def main(input_filename): # argv is a list of command line arguments
                 exit(1)
  
         # cycle through ROB
-        rob_entry = rob.rob_head_node() 
+        rob_entry = rob.rob_head_node(rob_dest) 
         while rob_entry != -1:
+            print rob_entry
             rob_entry_state = rob.rob_get_state(rob_entry)
             rob_entry_instruction_id = rob.rob_get_instruction_id(rob_entry)
             if rob_entry_state == "WB":
@@ -227,104 +232,145 @@ def main(input_filename): # argv is a list of command line arguments
                 # MEM -> WB
                 #---------------------------------------------------------------------
                 #can_move_from_mem_to_wb_stage = (forwarding_flag_set) & ((cycle_counter-mem_s) == 1)  & (!cdb_will_be_in_use_next_cycle) or (!forwarding_flag_set) & ((cycle_counter-mem_s) == fu_mem_cycles) & (!cdb_will_be_in_use_next_cycle)
-				print "TODO"
+				print "TODO MEM -> WB"
             elif rob_entry_state == "EX" and rob_entry_instruction_id == "LD":  
                 #---------------------------------------------------------------------
                 # EX -> MEM
                 #---------------------------------------------------------------------
                 #can_move_from_ex_to_mem_stage = (ld_instuction) & ((cycle_counter-ex_s) == fu_execution_cycles) & (!memory_will_be_in_use_next_cycle)
-                print "TODO"
+                print "TODO EX -> MEM"
             elif rob_entry_state == "EX" and rob_entry_instruction_id != "LD":    
                 #---------------------------------------------------------------------
                 # EX -> WB STAGE
                 #---------------------------------------------------------------------            
                 #can_move_from_ex_to_wb_stage = (!ld_instuction) & ((cycle_counter-ex_s) == fu_execution_cycles) & (!cdb_will_be_in_use_next_cycle)
-                
-				#if used int adder -> increment available_int_fu
-				print "TODO"
+                ex_stage_done = (timing_table.timing_table_check_if_done(rob.rob_get_tt_index(rob_entry), "EX", cycle_counter) == 1)
+				if ex_stage_done and !cdb_in_use:
+                    # move to wb stage
+                    if rob_entry_instruction_id in ["ADD", "ADDI", "SUB", "BEQ", "BNE"]:
+                        #increment available available_int_fu
+                        available_int_fu = available_int_fu + 1
+                #if used int adder -> increment available_int_fu
+				print "TODO EX -> WB"
             elif rob_entry_state == "ISSUE":    
                 #---------------------------------------------------------------------
                 # ISSUE -> EX
                 #---------------------------------------------------------------------            
                 #can_move_to_ex_stage = (alu_int_instruction) & (no_register_dependencies) & (available_int_fu) or (!alu_int_instruction) & (no_register_dependencies)
-                if rob_entry_instruction_id == "ADD":
+                if rob_entry_instruction_id in ["ADD", "ADDI"]:
                     # find rs entry (by using ROB entry name)
                     no_dependencies = (rs.rs_no_dependencies("int_adder_rs", rob_entry) != -1)
                     if no_dependencies and available_int_fu != 0:
                         # decrement available_int_fu
                         available_int_fu = available_int_fu - 1
                         # perform addition
-                        result = rs.rs_get_values("int_adder_rs", rob_entry)
+                        values = rs.rs_get_values("int_adder_rs", rob_entry)
+                        result = values[0] + values[1]
                         # add result to register buffer
                         print "TODO"
                         #update stage info in rob
                         rob.rob_update_state(rob_entry, "EX")
                         #update stage infor in tt
-                        timing_table.timing_table_update(rob.rob_get_tt_index(rob_entry), "EX", cycle_counter, (cycle_counter + int_adder_properties["cycles_in_ex"]-1))
-                elif rob_entry_instruction_id == "ADDI":
+                        print "ADD/ADDI STARTS IN CYCLE " + str(cycle_counter) + " AND ENDS IN CYCLE " + str(cycle_counter + int_adder_properties["cycles_in_ex"]-1)
+                        timing_table.timing_table_update(rob.rob_get_tt_index(rob_entry), "EX", cycle_counter, int_adder_properties["cycles_in_ex"])
+                elif rob_entry_instruction_id in ["SUB"]:
 					# find rs entry (by using ROB entry name)
                     no_dependencies = (rs.rs_no_dependencies("int_adder_rs", rob_entry) != -1)
                     if no_dependencies and available_int_fu != 0:
 						# decrement available_int_fu
-						# perform addition
-						# add result to register buffer
-						print "TODO"
-                elif rob_entry_instruction_id == "SUB":
-					# find rs entry (by using ROB entry name)
-                    no_dependencies = (rs.rs_no_dependencies("int_adder_rs", rob_entry) != -1)
-                    if no_dependencies and available_int_fu != 0:
-						# decrement available_int_fu
+                        available_int_fu = available_int_fu - 1
 						# perform subtraction
+                        values = rs.rs_get_values("int_adder_rs", rob_entry)
+                        result = values[0] - values[1]
 						# add result to register buffer
-						print "TODO"
+                        print "TODO"
+                        #update stage info in rob
+                        rob.rob_update_state(rob_entry, "EX")
+                        #update stage infor in tt
+                        timing_table.timing_table_update(rob.rob_get_tt_index(rob_entry), "EX", cycle_counter, int_adder_properties["cycles_in_ex"])
                 elif rob_entry_instruction_id == "ADD.D":
 					# find rs entry (by using ROB entry name)
-                    no_dependencies = (rs.rs_no_dependencies("int_adder_rs", rob_entry) != -1)
+                    no_dependencies = (rs.rs_no_dependencies("fp_adder_rs", rob_entry) != -1)
                     if no_dependencies and available_fp_adder_fu != 0:
 						# decrement available_fp_adder_fu
+                        available_fp_adder_fu = available_fp_adder_fu - 1
 						# perform addition
+                        values = rs.rs_get_values("fp_adder_rs", rob_entry)
+                        result = float(values[0] + values[1])
 						# add result to register buffer
-						print "TODO"
+                        print "TODO"
+                        #update stage info in rob
+                        rob.rob_update_state(rob_entry, "EX")
+                        #update stage infor in tt
+                        timing_table.timing_table_update(rob.rob_get_tt_index(rob_entry), "EX", cycle_counter, fp_adder_properties["cycles_in_ex"])
                 elif rob_entry_instruction_id == "SUB.D":
 					# find rs entry (by using ROB entry name)
-                    no_dependencies = (rs.rs_no_dependencies("int_adder_rs", rob_entry) != -1)
+                    no_dependencies = (rs.rs_no_dependencies("fp_adder_rs", rob_entry) != -1)
                     if no_dependencies and available_fp_adder_fu != 0:
 						# decrement available_fp_adder_fu
-						# perform subtraction
+                        available_fp_adder_fu = available_fp_adder_fu - 1
+						# perform addition
+                        values = rs.rs_get_values("fp_adder_rs", rob_entry)
+                        result = float(values[0] - values[1])
 						# add result to register buffer
-						print "TODO"
+                        print "TODO"
+                        #update stage info in rob
+                        rob.rob_update_state(rob_entry, "EX")
+                        #update stage infor in tt
+                        timing_table.timing_table_update(rob.rob_get_tt_index(rob_entry), "EX", cycle_counter, fp_adder_properties["cycles_in_ex"])
                 elif rob_entry_instruction_id == "MULT.D":
 					# find rs entry (by using ROB entry name)
-                    no_dependencies = (rs.rs_no_dependencies("int_adder_rs", rob_entry) != -1)
+                    no_dependencies = (rs.rs_no_dependencies("fp_multiplier_rs", rob_entry) != -1)
                     if no_dependencies and available_fp_mult_fu != 0:
 						# decrement available_fp_mult_fu
+                        available_fp_mult_fu = available_fp_mult_fu - 1
 						# perform multiplication
+                        values = rs.rs_get_values("fp_multiplier_rs", rob_entry)
+                        result = float(values[0]*values[1])
 						# add result to register buffer
-						print "TODO"
+                        print "TODO"
+                        #update stage info in rob
+                        rob.rob_update_state(rob_entry, "EX")
+                        #update stage infor in tt
+                        timing_table.timing_table_update(rob.rob_get_tt_index(rob_entry), "EX", cycle_counter, fp_multiplier_properties["cycles_in_ex"])
                 elif rob_entry_instruction_id == "BEQ": # resolve branch using int adder
 					# find rs entry (by using ROB entry name)
                     no_dependencies = (rs.rs_no_dependencies("int_adder_rs", rob_entry) != -1)
                     if no_dependencies and available_int_fu != 0:
 						# decrement available_int_fu
+                        available_int_fu = available_int_fu - 1
 						# perform subtraction
-						# what to do with result
-						print "TODO"
+                        values = rs.rs_get_values("int_adder_rs", rob_entry)
+                        result = (values[0] == values[1])
+						# add result to register buffer
+                        print "TODO"
+                        #update stage info in rob
+                        rob.rob_update_state(rob_entry, "EX")
+                        #update stage infor in tt
+                        timing_table.timing_table_update(rob.rob_get_tt_index(rob_entry), "EX", cycle_counter, int_adder_properties["cycles_in_ex"])
                 elif rob_entry_instruction_id == "BNE": # resolve branch using int adder
 					# find rs entry (by using ROB entry name)
                     no_dependencies = (rs.rs_no_dependencies("int_adder_rs", rob_entry) != -1)
                     if no_dependencies and available_int_fu != 0:
 						# decrement available_int_fu
+                        available_int_fu = available_int_fu - 1
 						# perform subtraction
-						# what to do with result
-						print "TODO"
+                        values = rs.rs_get_values("int_adder_rs", rob_entry)
+                        result = (values[0] != values[1])
+						# add result to register buffer
+                        print "TODO"
+                        #update stage info in rob
+                        rob.rob_update_state(rob_entry, "EX")
+                        #update stage infor in tt
+                        timing_table.timing_table_update(rob.rob_get_tt_index(rob_entry), "EX", cycle_counter, int_adder_properties["cycles_in_ex"])
                 elif instruction_id in ["SD", "LD"]: # calculate address
-                    no_dependencies = (rs.rs_no_dependencies("int_adder_rs", rob_entry) != -1)
-                    if no_dependencies:
+                    #no_dependencies = load_store_queue.load_store_queue_register_ready()
+                    #if no_dependencies:
 						# calculate address
 						# what to do with calculated address
-						print "TODO"
+                    print "TODO ISSUE -> EX FOR LD AND SD"
                         
-            if cycle_counter == 4:
+            if cycle_counter == 6:
                 print "EXITING..."
                 rob.rob_print()
                 rs.rs_print()

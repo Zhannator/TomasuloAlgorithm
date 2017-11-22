@@ -16,6 +16,6 @@ mem 8 2
 mem 12 3.4
 # instructions
 Add.d F1 F2 F3
-Add R2 R1 R0
+Addi R2 R1 8
 Add R2 R2 R0
 Mult.d F4 F2 F3

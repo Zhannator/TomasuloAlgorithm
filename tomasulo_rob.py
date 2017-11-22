@@ -115,12 +115,15 @@ class ROBobject:
         rob_update_index = int(rob_entry.split("ROB")[1])
         return self.rob[rob_update_index]["timing_table_entry_index"]        
 
-    def rob_head_node(self):
+    def rob_head_node(self, instruction_issue_indicator):
         # return the first entry in rob table, -1 if rob table is empty
-        if self.rob_check_counter == self.rob_add_counter: #returns -1 if there ROB is empty
+        if self.rob_add_counter == 0:
+            rob_add_counter_previous = len(self.rob) - 1
+        else:
+            rob_add_counter_previous = self.rob_add_counter - 1
+        if (self.rob_check_counter == self.rob_add_counter) or (instruction_issue_indicator != "-" and self.rob_check_counter == rob_add_counter_previous): #returns -1 if there ROB is empty
             return -1
         else:
-            print "ROB" + str(self.rob_check_counter)
             return "ROB" + str(self.rob_check_counter)
         
     def rob_next(self, rob_entry, instruction_issue_indicator):

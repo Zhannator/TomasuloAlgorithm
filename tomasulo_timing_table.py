@@ -27,6 +27,12 @@ class TTobject:
             self.timing_table[tt_entry_index][state + "_FINISH"] = current_cycle + num_of_op_cycles - 1
         else:
             self.timing_table[tt_entry_index][state] = current_cycle
+            
+    def timing_table_check_if_done(self, tt_entry_index, state, current_cycle):
+        if current_cycle > self.timing_table[tt_entry_index][state + "_FINISH"]:
+            return 1
+        else:
+            return -1
         
     def time_table_print(self):
         print "###############################################################################################################################################################"
