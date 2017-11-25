@@ -59,32 +59,28 @@ class ROBobject:
         else:
             return -1
     
-    def rob_check_if_ready_to_commit(self, rob_entry):
+    def rob_check_if_ready_to_commit(self):
         #use busy flag to check if top entry is ready 
         #rob_check_counter points to the oldest/top instruction
 
-        rob_index = int(rob_entry.split("ROB")[1])
-
-        if rob_index == rob_check_counter and self.rob[self.rob_check_counter]["busy"] == "no":
+        if self.rob_total_entries != 0 and self.rob[self.rob_check_counter]["busy"] == "no":
             #if ready to commit -> clear entry and return [destination, value]
-            print "rob" + str(self.rob_check_counter) + " is ready to commit"           
-            return_value = [self.rob[self.rob_check_counter]["destination"], self.rob[self.rob_check_counter]["value"]]
-            self.rob[self.rob_check_counter] = self.rob_empty_entry.copy()
-            if self.rob_check_counter + 1 == len(self.rob): # rotate ROB top entry counter
-                self.rob_check_counter = 0
-            else:
-                self.rob_check_counter = self.rob_check_counter + 1 # point to the next entry to ROB
-            self.rob_total_entries = self.rob_empty_entry - 1
-            return return_value
+            print "ROB" + str(self.rob_check_counter) + " is ready to commit"           
+            return 1
         else:
             return -1
 
-    def rob_commit():
-        self.rob[rob_check_counter] = self.rob_empty_entry.copy()
-        if rob_check_counter + 1 == len(self.rob):
-            rob_check_counter = 0
+    def rob_commit(self):
+        # return_value = [tt_index, destination, value, instruction_id]
+        return_value = [self.rob[self.rob_check_counter]["timing_table_entry_index"], self.rob[self.rob_check_counter]["destination"], self.rob[self.rob_check_counter]["value"], self.rob[self.rob_check_counter]["instruction"].split(" ")[0]]
+        self.rob[self.rob_check_counter] = self.rob_empty_entry.copy()
+        if self.rob_check_counter + 1 == len(self.rob):
+            self.rob_check_counter = 0
         else:
-            rob_check_counter = rob_check_counter + 1
+            self.rob_check_counter = self.rob_check_counter + 1
+        self.rob_total_entries = self.rob_total_entries - 1
+        print return_value
+        return return_value
             
     def rob_get_instruction_id(self, rob_entry):
         return self.rob[int(rob_entry.split("ROB")[1])]["instruction"].split(" ")[0]
@@ -102,6 +98,8 @@ class ROBobject:
         #use reservation stations to update rob when instructions have completed
         rob_update_index = int(rob_entry.split("ROB")[1])
         self.rob[rob_update_index]["value"] = rs_value
+        #specify that ROB is ready
+        self.rob[rob_update_index]["busy"] = "no"
         
     def rob_update_state(self, rob_entry, rs_state):
         #use reservation stations to update rob state field

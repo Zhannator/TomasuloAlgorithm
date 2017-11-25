@@ -88,6 +88,13 @@ class RSobject:
 				return [rs_entry["vj"], rs_entry["vk"]]
 		return -1		
         
+    def rs_clear_entry(self, rob_entry):
+        for rs_name in ["int_adder_rs", "fp_adder_rs", "fp_multiplier_rs"]:
+            for index, rs_entry in enumerate(self.rs[rs_name]):
+                if rs_entry["dest"] == rob_entry:
+                    del self.rs[rs_name][index]
+                    return
+                
     def rs_print(self):
         print "###############################################################################################################################################################"
         print "{:^159}".format("INTEGER ADDER RS")

@@ -18,7 +18,7 @@ num_rob_entries = 128 # number of ROB entries
 int_adder_properties = {
     "num_rs" : 2,
     "cycles_in_ex" : 1,
-    "num_fus" : 1
+    "num_fus" : 2
 }
 fp_adder_properties = {
     "num_rs" : 3,
@@ -72,12 +72,12 @@ def main(input_filename): # argv is a list of command line arguments
     #load_store_queue.load_store_queue_initialize()
     
     # GLOBAL CONTROL LOGIC SIGNALS
-    available_int_fu = fp_adder_properties["num_fus"] # decremented if someone starts using it, incremented if someone exits ex stage; if 0 - > no fu available
+    available_int_fu = int_adder_properties["num_fus"] # decremented if someone starts using it, incremented if someone exits ex stage; if 0 - > no fu available
+    
     timing_table_entry_index = 0
     memory_is_in_use = 0 # will be incremented by cycles_in_mem and decremented by 1's
     memory_buffer = [] # [address, value]
     cdb_in_use = 0 # will be 1 or 0
-    commit_in_use = 0 # will be 1 or 0
     arf_buffer = []
     # cdb_buffer_entry = {"destination" : "-", "value" : "-", "ready_cycle" : "-" # minimum cycle on which this information can be released }
     cdb_buffer = [] # treated as a priority queue, older buffer entries are at the top (smaller index)
@@ -90,16 +90,8 @@ def main(input_filename): # argv is a list of command line arguments
     PC = 0 # instruction buffer index, incremented by 4
     cycle_counter = 0
     while(1):
-        # print results and exit if rob is empty and instruction_buffer is exerted
-        if rob.rob_empty() and ((PC/4) > len(instruction_buffer)):
-            timing_table.time_table_print()
-            arf.arf_print()
-            memory.mem_print_non_zero_values()
-            exit(0)
-		
 		# INCREMENT CYCLE
         cycle_counter = cycle_counter + 1
-        print "CYCLE: " + str(cycle_counter)
 
         # RESET number of available fp fus
         available_fp_adder_fu = fp_adder_properties["num_fus"] # fp fus are pipelined, this number corresponds to how many fp adder instructions can be moved to ex stage in the same cycle; incremented when
@@ -115,12 +107,12 @@ def main(input_filename): # argv is a list of command line arguments
         
         # UPDATE ARFobject
         if arf_buffer != []:
-            arf_write(arf_buffer[0], arf_buffer[1])
+            arf.reg_write(arf_buffer[0], arf_buffer[1])
             arf_buffer = []
         
         # CHECK CDB BUFFER
         for index, entry in enumerate(cdb_buffer):
-            if cycle_counter >= entry["ready_cycle"]:
+            if cycle_counter >= (entry["ready_cycle"] + 1):
                 # update rs/rob
                 cdb_update(entry["destination"], entry["value"])
                 print "CDB UPDATE:" + entry["destination"] + ", " + str(entry["value"])
@@ -131,10 +123,28 @@ def main(input_filename): # argv is a list of command line arguments
         if cdb_in_use == 1:
             cdb_in_use = 0
         
-        # UPDATE CDB USAGE
-        if commit_in_use == 1:
-            commit_in_use = 0
+        #############################
+        #PRINTINT EVERY CYCLE
+        #rob.rob_print()
+        #rs.rs_print()
+        timing_table.time_table_print()
+        #memory.mem_print_non_zero_values()
+        #arf.reg_print()
         
+        #if cycle_counter == 6:
+        #    print "EXITING..."
+        #    exit(0)
+        #############################
+        
+        # print results and exit if rob is empty and instruction_buffer is exerted
+        if (rob.rob_empty() == 1) and ((PC/4) >= len(instruction_buffer)):
+            timing_table.time_table_print()
+            arf.reg_print()
+            memory.mem_print_non_zero_values()
+            break
+        
+        print "-------------------------- CYCLE " + str(cycle_counter) + " --------------------------"
+        print "available_int_fu: " + str(available_int_fu)
         # SEPARATE FROM ROB
         
         #---------------------------------------------------------------------
@@ -143,13 +153,13 @@ def main(input_filename): # argv is a list of command line arguments
         # can_issue_new_instuction = (available_instuction_in_instruction_buffer) & (available_rob_entry) &  (available_rs_entry)
         rob_dest = "-" # signifies that an instruction wasn't issued on this cycle if stays to be "-"
         available_instuction_in_instruction_buffer = ((PC/4) < len(instruction_buffer))
-        print "available_instuction_in_instruction_buffer: " + str(available_instuction_in_instruction_buffer)
+        #print "available_instuction_in_instruction_buffer: " + str(available_instuction_in_instruction_buffer)
         available_rob_entry = (rob.rob_available() == 1)
-        print "available_rob_entry: " + str(available_rob_entry)
+        #print "available_rob_entry: " + str(available_rob_entry)
         if available_instuction_in_instruction_buffer and available_rob_entry:
             # get insturction
             instruction = instruction_buffer[(PC/4)]
-            print "instruction: " + instruction
+            print "issued instruction: " + instruction
             instruction_parsed = instruction.split(" ")
             instruction_id = instruction_parsed[0]
             # check if there is an available rs entry based on instruction op       
@@ -203,7 +213,7 @@ def main(input_filename): # argv is a list of command line arguments
                     timing_table.timing_table_add(PC, instruction, cycle_counter)
                     PC = PC + 4
             elif instruction_id in ["LD", "SD"]:
-                print "HANDLE LD AND SD TODO"
+                print "TODO HANDLE LD AND SD ISSUE"
             else:
                 print "Invalid instuction!"
                 exit(1)
@@ -211,34 +221,10 @@ def main(input_filename): # argv is a list of command line arguments
         # cycle through ROB
         rob_entry = rob.rob_head_node(rob_dest) 
         while rob_entry != -1:
-            print rob_entry
+            print "-- checking rob entry " + rob_entry + " --"
             rob_entry_state = rob.rob_get_state(rob_entry)
             rob_entry_instruction_id = rob.rob_get_instruction_id(rob_entry)
-            if rob_entry_state == "WB":
-                #---------------------------------------------------------------------
-                # WB -> COMMIT STAGE
-                #---------------------------------------------------------------------
-                #can_move_from_wb_to_commit = (!commit_in_use) & (rob_top_instruction_ready_to_commit)
-                if commit_in_use == 0 and rob.rob_top_instruction_ready_to_commit(rob_entry):
-                    if rob_entry_instruction_id in ["ADD", "ADDI", "SUB", "ADD.D", "SUB.D", "MULT.D", "LD"]: 
-                        #set arf buffer
-                        arf_buffer = [rob.rob_get_destination(rob_entry), rob.rob_get_value(rob_entry)]
-                        #clear rob entry
-                        rob.rob_commit()
-                    elif instruction_id in ["SD"] and memory_is_in_use == 0:
-                        #set memory_buffer
-                        memory_buffer = [rob.rob_get_destination(rob_entry), rob.rob_get_value(rob_entry)]
-                        #update timing table
-                        timing_table.timing_table_update(rob.rob_get_tt_index(rob_entry), "COMMIT", cycle_counter, load_store_unit_properties["cycles_in_mem"])
-                        #set memory in use
-                        memory_is_in_use = load_store_unit_properties["cycles_in_mem"]
-                        #clear rob entry
-                        rob.rob_commit()
-                    elif instruction_id in ["BEQ", "BNE"]:
-                        #clear rob entry
-                        rob.rob_commit()
-                    commit_in_use = 1
-            elif rob_entry_state == "MEM":
+            if rob_entry_state == "MEM":
                 #---------------------------------------------------------------------
                 # MEM -> WB
                 #---------------------------------------------------------------------
@@ -261,8 +247,19 @@ def main(input_filename): # argv is a list of command line arguments
                     if rob_entry_instruction_id in ["ADD", "ADDI", "SUB", "BEQ", "BNE"]:
                         #increment available available_int_fu
                         available_int_fu = available_int_fu + 1
-                #if used int adder -> increment available_int_fu
-                print "TODO EX -> WB"
+                        
+                    if rob_entry_instruction_id in ["ADD", "ADDI", "SUB", "ADD.D", "SUB.D", "MULT.D"]:
+                        # normal writeback procedure
+                        cdb_in_use = 1
+                        # clear rs entry
+                        rs.rs_clear_entry(rob_entry)
+                        # update rob state
+                        rob.rob_update_state(rob_entry, "WB")
+                        # update timing table
+                        print "WB FOR " + rob_entry + ": " + str(cycle_counter)
+                        timing_table.timing_table_update(rob.rob_get_tt_index(rob_entry), "WB", cycle_counter, 1)
+                    else:
+                        print "TODO WB FOR NON ALU"                    
             elif rob_entry_state == "ISSUE":    
                 #---------------------------------------------------------------------
                 # ISSUE -> EX
@@ -282,7 +279,7 @@ def main(input_filename): # argv is a list of command line arguments
                         #update stage info in rob
                         rob.rob_update_state(rob_entry, "EX")
                         #update stage infor in tt
-                        print "ADD/ADDI STARTS IN CYCLE " + str(cycle_counter) + " AND ENDS IN CYCLE " + str(cycle_counter + int_adder_properties["cycles_in_ex"]-1)
+                        print "EX FOR " + rob_entry + ": ADD/ADDI STARTS IN CYCLE " + str(cycle_counter) + " AND ENDS IN CYCLE " + str(cycle_counter + int_adder_properties["cycles_in_ex"]-1)
                         timing_table.timing_table_update(rob.rob_get_tt_index(rob_entry), "EX", cycle_counter, int_adder_properties["cycles_in_ex"])
                 elif rob_entry_instruction_id in ["SUB"]:
 					# find rs entry (by using ROB entry name)
@@ -298,7 +295,7 @@ def main(input_filename): # argv is a list of command line arguments
                         #update stage info in rob
                         rob.rob_update_state(rob_entry, "EX")
                         #update stage infor in tt
-                        print "SUB STARTS IN CYCLE " + str(cycle_counter) + " AND ENDS IN CYCLE " + str(cycle_counter + int_adder_properties["cycles_in_ex"]-1)
+                        print "EX FOR " + rob_entry + ": SUB STARTS IN CYCLE " + str(cycle_counter) + " AND ENDS IN CYCLE " + str(cycle_counter + int_adder_properties["cycles_in_ex"]-1)
                         timing_table.timing_table_update(rob.rob_get_tt_index(rob_entry), "EX", cycle_counter, int_adder_properties["cycles_in_ex"])
                 elif rob_entry_instruction_id == "ADD.D":
 					# find rs entry (by using ROB entry name)
@@ -314,7 +311,7 @@ def main(input_filename): # argv is a list of command line arguments
                         #update stage info in rob
                         rob.rob_update_state(rob_entry, "EX")
                         #update stage infor in tt
-                        print "ADD.D STARTS IN CYCLE " + str(cycle_counter) + " AND ENDS IN CYCLE " + str(cycle_counter + fp_adder_properties["cycles_in_ex"]-1)
+                        print "EX FOR " + rob_entry + ": ADD.D STARTS IN CYCLE " + str(cycle_counter) + " AND ENDS IN CYCLE " + str(cycle_counter + fp_adder_properties["cycles_in_ex"]-1)
                         timing_table.timing_table_update(rob.rob_get_tt_index(rob_entry), "EX", cycle_counter, fp_adder_properties["cycles_in_ex"])
                 elif rob_entry_instruction_id == "SUB.D":
 					# find rs entry (by using ROB entry name)
@@ -330,7 +327,7 @@ def main(input_filename): # argv is a list of command line arguments
                         #update stage info in rob
                         rob.rob_update_state(rob_entry, "EX")
                         #update stage infor in tt
-                        print "SUB.D STARTS IN CYCLE " + str(cycle_counter) + " AND ENDS IN CYCLE " + str(cycle_counter + fp_adder_properties["cycles_in_ex"]-1)
+                        print "EX FOR " + rob_entry + ": SUB.D STARTS IN CYCLE " + str(cycle_counter) + " AND ENDS IN CYCLE " + str(cycle_counter + fp_adder_properties["cycles_in_ex"]-1)
                         timing_table.timing_table_update(rob.rob_get_tt_index(rob_entry), "EX", cycle_counter, fp_adder_properties["cycles_in_ex"])
                 elif rob_entry_instruction_id == "MULT.D":
 					# find rs entry (by using ROB entry name)
@@ -346,7 +343,7 @@ def main(input_filename): # argv is a list of command line arguments
                         #update stage info in rob
                         rob.rob_update_state(rob_entry, "EX")
                         #update stage infor in tt
-                        print "SUB.D STARTS IN CYCLE " + str(cycle_counter) + " AND ENDS IN CYCLE " + str(cycle_counter + fp_multiplier_properties["cycles_in_ex"]-1)
+                        print "EX FOR " + rob_entry + ": SUB.D STARTS IN CYCLE " + str(cycle_counter) + " AND ENDS IN CYCLE " + str(cycle_counter + fp_multiplier_properties["cycles_in_ex"]-1)
                         timing_table.timing_table_update(rob.rob_get_tt_index(rob_entry), "EX", cycle_counter, fp_multiplier_properties["cycles_in_ex"])
                 elif rob_entry_instruction_id == "BEQ": # resolve branch using int adder
 					# find rs entry (by using ROB entry name)
@@ -358,7 +355,7 @@ def main(input_filename): # argv is a list of command line arguments
                         values = rs.rs_get_values("int_adder_rs", rob_entry)
                         result = (values[0] == values[1])
 						# add result to branch buffer
-                        print "TODO BRANCH BUFFER"
+                        print "TODO UPDATE BRANCH BUFFER"
                         #update stage info in rob
                         rob.rob_update_state(rob_entry, "EX")
                         #update stage infor in tt
@@ -373,7 +370,7 @@ def main(input_filename): # argv is a list of command line arguments
                         values = rs.rs_get_values("int_adder_rs", rob_entry)
                         result = (values[0] != values[1])
 						# add result to cdb buffer
-                        print "TODO"
+                        print "TODO UPDATE BRANCH BUFFER"
                         #update stage info in rob
                         rob.rob_update_state(rob_entry, "EX")
                         #update stage infor in tt
@@ -385,23 +382,34 @@ def main(input_filename): # argv is a list of command line arguments
 						# what to do with calculated address
                     print "TODO ISSUE -> EX FOR LD AND SD"
                         
-            if cycle_counter == 6:
-                print "EXITING..."
-                rob.rob_print()
-                rs.rs_print()
-                timing_table.time_table_print()
-                memory.mem_print_non_zero_values()
-                arf.arf_print()
-                exit(0)
-				
             rob_entry = rob.rob_next(rob_entry, rob_dest)
-            
-    
+        
+        #---------------------------------------------------------------------
+        # WB -> COMMIT STAGE
+        #---------------------------------------------------------------------
+        #can_move_from_wb_to_commit = (!commit_in_use) & (rob_top_instruction_ready_to_commit)
+        if rob.rob_check_if_ready_to_commit() != -1:
+            #clear rob entry
+            rob_entry_data = rob.rob_commit() # [tt_index, destination, value, instruction_id]
+            cycles_in_commit = 1
+            if rob_entry_data[3] in ["ADD", "ADDI", "SUB", "ADD.D", "SUB.D", "MULT.D", "LD"]: 
+                #set arf buffer
+                arf_buffer = [rob_entry_data[1], rob_entry_data[2]]
+            elif rob_entry_data[3] in ["SD"] and memory_is_in_use == 0:
+                #set memory_buffer
+                memory_buffer = [rob_entry_data[1], rob_entry_data[2]]
+                cycles_in_commit = load_store_unit_properties["cycles_in_mem"]
+                #set memory in use
+                memory_is_in_use = load_store_unit_properties["cycles_in_mem"]
+            #update timing table
+            timing_table.timing_table_update(rob_entry_data[0], "COMMIT", cycle_counter, cycles_in_commit)    
+            print "COMMIT FOR " + rob_entry_data[1] + ": STARTS IN CYCLE " + str(cycle_counter) + " AND ENDS IN CYCLE " + str(cycle_counter + cycles_in_commit - 1)        
+        
     rob.rob_print()
     rs.rs_print() 
     timing_table.time_table_print()
     memory.mem_print_non_zero_values()
-    arf.arf_print()
+    arf.reg_print()
 ############################################################################################################
 
 ############################################################################################################
