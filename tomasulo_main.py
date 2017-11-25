@@ -79,6 +79,8 @@ def main(input_filename): # argv is a list of command line arguments
     cdb_in_use = 0 # will be 1 or 0
     commit_in_use = 0 # will be 1 or 0
     arf_buffer = []
+    # cdb_buffer_entry = {"destination" : "-", "value" : "-", "ready_cycle" : "-" # minimum cycle on which this information can be released }
+    cdb_buffer = [] # treated as a priority queue, older buffer entries are at the top (smaller index)
     
     #-------------------------------------------------
     # PIPELINE V1: assume only # ALU Instructions and no dependencies 
@@ -116,6 +118,15 @@ def main(input_filename): # argv is a list of command line arguments
             arf_write(arf_buffer[0], arf_buffer[1])
             arf_buffer = []
         
+        # CHECK CDB BUFFER
+        for index, entry in enumerate(cdb_buffer):
+            if cycle_counter >= entry["ready_cycle"]:
+                # update rs/rob
+                cdb_update(entry["destination"], entry["value"])
+                print "CDB UPDATE:" + entry["destination"] + ", " + str(entry["value"])
+                del cdb_buffer[index]
+                break
+                
         # UPDATE CDB USAGE
         if cdb_in_use == 1:
             cdb_in_use = 0
@@ -245,13 +256,13 @@ def main(input_filename): # argv is a list of command line arguments
                 #---------------------------------------------------------------------            
                 #can_move_from_ex_to_wb_stage = (!ld_instuction) & ((cycle_counter-ex_s) == fu_execution_cycles) & (!cdb_will_be_in_use_next_cycle)
                 ex_stage_done = (timing_table.timing_table_check_if_done(rob.rob_get_tt_index(rob_entry), "EX", cycle_counter) == 1)
-				if ex_stage_done and !cdb_in_use:
+                if ex_stage_done and cdb_in_use == 0:
                     # move to wb stage
                     if rob_entry_instruction_id in ["ADD", "ADDI", "SUB", "BEQ", "BNE"]:
                         #increment available available_int_fu
                         available_int_fu = available_int_fu + 1
                 #if used int adder -> increment available_int_fu
-				print "TODO EX -> WB"
+                print "TODO EX -> WB"
             elif rob_entry_state == "ISSUE":    
                 #---------------------------------------------------------------------
                 # ISSUE -> EX
@@ -266,8 +277,8 @@ def main(input_filename): # argv is a list of command line arguments
                         # perform addition
                         values = rs.rs_get_values("int_adder_rs", rob_entry)
                         result = values[0] + values[1]
-                        # add result to register buffer
-                        print "TODO"
+                        # add result to cdb buffer                        
+                        cdb_buffer.append({"destination" : rob_entry, "value" : result, "ready_cycle" : cycle_counter + int_adder_properties["cycles_in_ex"]}.copy())
                         #update stage info in rob
                         rob.rob_update_state(rob_entry, "EX")
                         #update stage infor in tt
@@ -282,11 +293,12 @@ def main(input_filename): # argv is a list of command line arguments
 						# perform subtraction
                         values = rs.rs_get_values("int_adder_rs", rob_entry)
                         result = values[0] - values[1]
-						# add result to register buffer
-                        print "TODO"
+						# add result to cdb buffer
+                        cdb_buffer.append({"destination" : rob_entry, "value" : result, "ready_cycle" : cycle_counter + int_adder_properties["cycles_in_ex"]}.copy())
                         #update stage info in rob
                         rob.rob_update_state(rob_entry, "EX")
                         #update stage infor in tt
+                        print "SUB STARTS IN CYCLE " + str(cycle_counter) + " AND ENDS IN CYCLE " + str(cycle_counter + int_adder_properties["cycles_in_ex"]-1)
                         timing_table.timing_table_update(rob.rob_get_tt_index(rob_entry), "EX", cycle_counter, int_adder_properties["cycles_in_ex"])
                 elif rob_entry_instruction_id == "ADD.D":
 					# find rs entry (by using ROB entry name)
@@ -297,11 +309,12 @@ def main(input_filename): # argv is a list of command line arguments
 						# perform addition
                         values = rs.rs_get_values("fp_adder_rs", rob_entry)
                         result = float(values[0] + values[1])
-						# add result to register buffer
-                        print "TODO"
+						# add result to cdb buffer
+                        cdb_buffer.append({"destination" : rob_entry, "value" : result, "ready_cycle" : cycle_counter + fp_adder_properties["cycles_in_ex"]}.copy())
                         #update stage info in rob
                         rob.rob_update_state(rob_entry, "EX")
                         #update stage infor in tt
+                        print "ADD.D STARTS IN CYCLE " + str(cycle_counter) + " AND ENDS IN CYCLE " + str(cycle_counter + fp_adder_properties["cycles_in_ex"]-1)
                         timing_table.timing_table_update(rob.rob_get_tt_index(rob_entry), "EX", cycle_counter, fp_adder_properties["cycles_in_ex"])
                 elif rob_entry_instruction_id == "SUB.D":
 					# find rs entry (by using ROB entry name)
@@ -312,11 +325,12 @@ def main(input_filename): # argv is a list of command line arguments
 						# perform addition
                         values = rs.rs_get_values("fp_adder_rs", rob_entry)
                         result = float(values[0] - values[1])
-						# add result to register buffer
-                        print "TODO"
+						# add result to cdb buffer
+                        cdb_buffer.append({"destination" : rob_entry, "value" : result, "ready_cycle" : cycle_counter + fp_adder_properties["cycles_in_ex"]}.copy())
                         #update stage info in rob
                         rob.rob_update_state(rob_entry, "EX")
                         #update stage infor in tt
+                        print "SUB.D STARTS IN CYCLE " + str(cycle_counter) + " AND ENDS IN CYCLE " + str(cycle_counter + fp_adder_properties["cycles_in_ex"]-1)
                         timing_table.timing_table_update(rob.rob_get_tt_index(rob_entry), "EX", cycle_counter, fp_adder_properties["cycles_in_ex"])
                 elif rob_entry_instruction_id == "MULT.D":
 					# find rs entry (by using ROB entry name)
@@ -327,11 +341,12 @@ def main(input_filename): # argv is a list of command line arguments
 						# perform multiplication
                         values = rs.rs_get_values("fp_multiplier_rs", rob_entry)
                         result = float(values[0]*values[1])
-						# add result to register buffer
-                        print "TODO"
+						# add result to cdb buffer
+                        cdb_buffer.append({"destination" : rob_entry, "value" : result, "ready_cycle" : cycle_counter + fp_multiplier_properties["cycles_in_ex"]}.copy())
                         #update stage info in rob
                         rob.rob_update_state(rob_entry, "EX")
                         #update stage infor in tt
+                        print "SUB.D STARTS IN CYCLE " + str(cycle_counter) + " AND ENDS IN CYCLE " + str(cycle_counter + fp_multiplier_properties["cycles_in_ex"]-1)
                         timing_table.timing_table_update(rob.rob_get_tt_index(rob_entry), "EX", cycle_counter, fp_multiplier_properties["cycles_in_ex"])
                 elif rob_entry_instruction_id == "BEQ": # resolve branch using int adder
 					# find rs entry (by using ROB entry name)
@@ -342,8 +357,8 @@ def main(input_filename): # argv is a list of command line arguments
 						# perform subtraction
                         values = rs.rs_get_values("int_adder_rs", rob_entry)
                         result = (values[0] == values[1])
-						# add result to register buffer
-                        print "TODO"
+						# add result to branch buffer
+                        print "TODO BRANCH BUFFER"
                         #update stage info in rob
                         rob.rob_update_state(rob_entry, "EX")
                         #update stage infor in tt
@@ -357,7 +372,7 @@ def main(input_filename): # argv is a list of command line arguments
 						# perform subtraction
                         values = rs.rs_get_values("int_adder_rs", rob_entry)
                         result = (values[0] != values[1])
-						# add result to register buffer
+						# add result to cdb buffer
                         print "TODO"
                         #update stage info in rob
                         rob.rob_update_state(rob_entry, "EX")
@@ -498,15 +513,18 @@ def get_current_reg_info(reg_name): # returns [v, q]
     
     print "GET CURRENT REG INFO TODO"
     
-############################################################################################################
-
-############################################################################################################
-# CDB TEMPORARY
-############################################################################################################
-def cdb():
+def cdb_update(destination, value):
     # when value is ready in RS -> broadcast values to ROB, RS
     # other situations
-    print "CDB TODO"
+    
+    # check and update rs
+    rs.rs_update_value(destination, value)
+    
+    # check and update load store queue
+    print "TODO CDB UPDATE FOR LOAD STORE QUEUE"
+    
+    # check and update rob
+    rob.rob_update_value(destination, value)
 ############################################################################################################
 
 if __name__ == "__main__":

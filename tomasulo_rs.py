@@ -67,8 +67,19 @@ class RSobject:
 					return -1
 		return -1
 	
-    def rs_update_value():
-        print "RS UPDATE VALUE TODO"
+    def rs_update_value(self, destination, value):
+        # find all the rs entries that use this rob entry as a place holder and update items
+        for rs_name in ["int_adder_rs", "fp_adder_rs", "fp_multiplier_rs"]:
+            for entry in self.rs[rs_name]:
+                # check qj and qk
+                if entry["qj"] == destination:
+                    entry["qj"] = "-"
+                    entry["vj"] = value
+                if entry["qk"] == destination:
+                    entry["qk"] = "-"
+                    entry["vk"] = value
+                if entry["qj"] == "-" and entry["qk"] == "-":
+                    entry["busy"] = "no"
         
     def rs_get_values(self, rs_name, rob_entry):
 		#returns [vj, vk]
