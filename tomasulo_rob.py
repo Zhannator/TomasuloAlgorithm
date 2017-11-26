@@ -71,8 +71,8 @@ class ROBobject:
             return -1
 
     def rob_commit(self):
-        # return_value = [tt_index, destination, value, instruction_id]
-        return_value = [self.rob[self.rob_check_counter]["timing_table_entry_index"], self.rob[self.rob_check_counter]["destination"], self.rob[self.rob_check_counter]["value"], self.rob[self.rob_check_counter]["instruction"].split(" ")[0]]
+        # return_value = [tt_index, destination, value, instruction_id, rob_entry_name]
+        return_value = [self.rob[self.rob_check_counter]["timing_table_entry_index"], self.rob[self.rob_check_counter]["destination"], self.rob[self.rob_check_counter]["value"], self.rob[self.rob_check_counter]["instruction"].split(" ")[0], "ROB"+str(self.rob_check_counter)]
         self.rob[self.rob_check_counter] = self.rob_empty_entry.copy()
         if self.rob_check_counter + 1 == len(self.rob):
             self.rob_check_counter = 0

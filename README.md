@@ -38,7 +38,7 @@ PIPELINE STAGES:
  ISSUE: instruction fetch and decode,
         branch instructions are issued into int_adder_rs
     EX: calculates addresses for loads and stores, branch resolution, 
-        uses load/store queue and doesn't occupy integer ALU, branch resolution
+        uses load/store queue and doesn't occupy integer ALU
    MEM: load can go to mem if no forwarding-from-a-store was found,
         takes 1 cycle to perform the forwarding if a match is found,
         load gets the value and clears its entry in the queue

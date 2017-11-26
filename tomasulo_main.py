@@ -3,7 +3,6 @@
 
 # public libraries
 from sys import argv
-import numpy as np
 
 # private libraries
 import tomasulo_rat
@@ -12,6 +11,7 @@ import tomasulo_arf
 import tomasulo_mem
 import tomasulo_rob
 import tomasulo_timing_table
+import tomasulo_load_store_queue
 
 # GLOBAL PARAMETERS
 num_rob_entries = 128 # number of ROB entries
@@ -45,7 +45,7 @@ rat = tomasulo_rat.RATobject()
 rs = tomasulo_rs.RSobject()
 rob = tomasulo_rob.ROBobject()
 timing_table = tomasulo_timing_table.TTobject() # doesn't need to be initialized
-load_store_queue = [] # doesn't need to be initialized
+lsq = tomasulo_load_store_queue.LSQobject()
 
 ############################################################################################################
 # MAIN
@@ -68,12 +68,12 @@ def main(input_filename): # argv is a list of command line arguments
     rs.rs_initialize(int_adder_properties["num_rs"], fp_adder_properties["num_rs"], fp_multiplier_properties["num_rs"])
     # initialize rob
     rob.rob_initialize(num_rob_entries)
-    # initialize load/store queue
-    #load_store_queue.load_store_queue_initialize()
-    
+    # initialize load store queue
+    lsq.lsq_initialize(load_store_unit_properties["num_rs"])    
+        
     # GLOBAL CONTROL LOGIC SIGNALS
     available_int_fu = int_adder_properties["num_fus"] # decremented if someone starts using it, incremented if someone exits ex stage; if 0 - > no fu available
-    
+    available_ls_fu = load_store_unit_properties["num_fus"] # decremented if someone starts using it, incremented if someone exits ex stage; if 0 - > no fu available
     timing_table_entry_index = 0
     memory_is_in_use = 0 # will be incremented by cycles_in_mem and decremented by 1's
     memory_buffer = [] # [address, value]
@@ -81,9 +81,10 @@ def main(input_filename): # argv is a list of command line arguments
     arf_buffer = []
     # cdb_buffer_entry = {"destination" : "-", "value" : "-", "ready_cycle" : "-" # minimum cycle on which this information can be released }
     cdb_buffer = [] # treated as a priority queue, older buffer entries are at the top (smaller index)
+    ls_buffer = [] # once addresses are calculated -> they are written to lsq_add
     
     #-------------------------------------------------
-    # PIPELINE V1: assume only # ALU Instructions and no dependencies 
+    # PIPELINE
     #-------------------------------------------------
     
     # each loop run is a new cycle, exits when all the instructions exitited pipeline and instruction buffer has been used up
@@ -115,9 +116,18 @@ def main(input_filename): # argv is a list of command line arguments
             if cycle_counter >= (entry["ready_cycle"] + 1):
                 # update rs/rob
                 cdb_update(entry["destination"], entry["value"])
-                print "CDB UPDATE:" + entry["destination"] + ", " + str(entry["value"])
+                print "CDB UPDATE: " + entry["destination"] + ", " + str(entry["value"])
                 del cdb_buffer[index]
                 break
+        
+        # CHECK LS BUFFER
+        for index, entry in enumerate(ls_buffer):
+            if cycle_counter >= (entry["ready_cycle"]):
+                available_ls_fu = available_ls_fu + 1
+                # update lsq
+                lsq.lsq_update_address(entry["destination"], entry["address"])
+                print "LSQ UPDATE ADDRESS: " + entry["destination"] + ", " + str(entry["address"])
+                del ls_buffer[index]
                 
         # UPDATE CDB USAGE
         if cdb_in_use == 1:
@@ -127,20 +137,15 @@ def main(input_filename): # argv is a list of command line arguments
         #PRINTINT EVERY CYCLE
         #rob.rob_print()
         #rs.rs_print()
-        timing_table.time_table_print()
+        #timing_table.time_table_print()
         #memory.mem_print_non_zero_values()
         #arf.reg_print()
-        
-        #if cycle_counter == 6:
-        #    print "EXITING..."
-        #    exit(0)
-        #############################
         
         # print results and exit if rob is empty and instruction_buffer is exerted
         if (rob.rob_empty() == 1) and ((PC/4) >= len(instruction_buffer)):
             timing_table.time_table_print()
             arf.reg_print()
-            memory.mem_print_non_zero_values()
+            memory.mem_print_non_zero_values()                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      
             break
         
         print "-------------------------- CYCLE " + str(cycle_counter) + " --------------------------"
@@ -212,8 +217,39 @@ def main(input_filename): # argv is a list of command line arguments
                     rs.rs_add("fp_multiplier_rs", instruction_id, rob_dest, reg1[0], reg2[0], reg1[1], reg2[1]) # rs_name, i, op, dest, vj, vk, qj, qk
                     timing_table.timing_table_add(PC, instruction, cycle_counter)
                     PC = PC + 4
-            elif instruction_id in ["LD", "SD"]:
-                print "TODO HANDLE LD AND SD ISSUE"
+            elif instruction_id in ["SD"]:
+                available_rs_entry = (lsq.lsq_available() != -1)
+                if available_rs_entry:
+                    # add entry
+                    #check if we have the needed values
+                    addr_reg = get_current_reg_info(instruction_parsed[2].split("(")[1].split(")")[0]) # reg_name
+                    constant = instruction_parsed[2].split("(")[0]
+                    #specific to SD
+                    source_reg = get_current_reg_info(instruction_parsed[1]) # only needed for store instructions
+                    rob_dest = rob.rob_instr_add(instruction, "-", timing_table_entry_index)
+                    timing_table_entry_index = timing_table_entry_index + 1
+                    #no need to update rat since we are only storing a value to memory (not bringing anything back)
+                    #add entry to lsq
+                    lsq.lsq_add(instruction_id, constant, addr_reg[0], addr_reg[1], source_reg[0], source_reg[1], rob_dest)
+                    timing_table.timing_table_add(PC, instruction, cycle_counter)
+                    PC = PC + 4
+            elif instruction_id in ["LD"]:
+                available_rs_entry = (lsq.lsq_available() != -1)
+                if available_rs_entry:
+                    # add entry
+                    #check if we have the needed values
+                    addr_reg = get_current_reg_info(instruction_parsed[2].split("(")[1].split(")")[0]) # reg_name
+                    constant = instruction_parsed[2].split("(")[0]
+                    #specific to SD
+                    source_reg = ["-", "-"]
+                    rob_dest = rob.rob_instr_add(instruction, instruction_parsed[1], timing_table_entry_index)
+                    timing_table_entry_index = timing_table_entry_index + 1
+                    #update rat
+                    rat.rat_update(instruction_parsed[1], rob_dest) # need to update rat
+                    #add entry to lsq
+                    lsq.lsq_add(instruction_id, constant, addr_reg[0], addr_reg[1], source_reg[0], source_reg[1], rob_dest)
+                    timing_table.timing_table_add(PC, instruction, cycle_counter)
+                    PC = PC + 4
             else:
                 print "Invalid instuction!"
                 exit(1)
@@ -229,13 +265,30 @@ def main(input_filename): # argv is a list of command line arguments
                 # MEM -> WB
                 #---------------------------------------------------------------------
                 #can_move_from_mem_to_wb_stage = (forwarding_flag_set) & ((cycle_counter-mem_s) == 1)  & (!cdb_will_be_in_use_next_cycle) or (!forwarding_flag_set) & ((cycle_counter-mem_s) == fu_mem_cycles) & (!cdb_will_be_in_use_next_cycle)
-				print "TODO MEM -> WB"
+				mem_stage_done = (timing_table.timing_table_check_if_done(rob.rob_get_tt_index(rob_entry), "MEM", cycle_counter) == 1)
+                if mem_stage_done:
+                print "TODO MEM -> WB"
             elif rob_entry_state == "EX" and rob_entry_instruction_id == "LD":  
                 #---------------------------------------------------------------------
                 # EX -> MEM
                 #---------------------------------------------------------------------
                 #can_move_from_ex_to_mem_stage = (ld_instuction) & ((cycle_counter-ex_s) == fu_execution_cycles) & (!memory_will_be_in_use_next_cycle)
-                print "TODO EX -> MEM"
+                ex_stage_done = (timing_table.timing_table_check_if_done(rob.rob_get_tt_index(rob_entry), "EX", cycle_counter) == 1)
+                if ex_stage_done:
+                    forwarding_happened = (lsq.lsq_forwarding(rob_entry) != -1)
+                    if forwarding_happened:
+                        #update timing table
+                        print "MEM FOR " + rob_entry + ": LD STARTS IN CYCLE " + str(cycle_counter) + " AND ENDS IN CYCLE " + str(cycle_counter)
+                        timing_table.timing_table_update(rob.rob_get_tt_index(rob_entry), "MEM", cycle_counter, 1)
+                    elif memory_is_in_use == 0:
+                        #update timing table
+                        print "MEM FOR " + rob_entry + ": LD STARTS IN CYCLE " + str(cycle_counter) + " AND ENDS IN CYCLE " + str(cycle_counter + load_store_unit_properties["cycles_in_mem"]-1)
+                        timing_table.timing_table_update(rob.rob_get_tt_index(rob_entry), "MEM", cycle_counter, load_store_unit_properties["cycles_in_mem"])
+                    #update rob
+                    rob.rob_update_state(rob_entry, "MEM")        
+                    
+                    # WHAT DO WE DO WITH VALUE FROM MEMORY? !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+                    value_loaded_from_memory = memory.mem_read(lsq.lsq_get_address(rob_entry))
             elif rob_entry_state == "EX" and rob_entry_instruction_id != "LD":    
                 #---------------------------------------------------------------------
                 # EX -> WB STAGE
@@ -246,7 +299,7 @@ def main(input_filename): # argv is a list of command line arguments
                     # move to wb stage
                     if rob_entry_instruction_id in ["ADD", "ADDI", "SUB", "BEQ", "BNE"]:
                         #increment available available_int_fu
-                        available_int_fu = available_int_fu + 1
+                        available_int_fu = available_int_fu + 1 #MAY BE A PROBLEM (CHECK LATER - MAY NEED TO DO THIS BEFORE CYCLING THROUGH ROB) !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
                         
                     if rob_entry_instruction_id in ["ADD", "ADDI", "SUB", "ADD.D", "SUB.D", "MULT.D"]:
                         # normal writeback procedure
@@ -376,13 +429,22 @@ def main(input_filename): # argv is a list of command line arguments
                         #update stage infor in tt
                         timing_table.timing_table_update(rob.rob_get_tt_index(rob_entry), "EX", cycle_counter, int_adder_properties["cycles_in_ex"])
                 elif instruction_id in ["SD", "LD"]: # calculate address
-                    #no_dependencies = load_store_queue.load_store_queue_register_ready()
-                    #if no_dependencies:
+                    no_dependencies = (lsq.lsq_addr_reg_ready(rob_entry) != -1)
+                    if no_dependencies and available_ls_fu != 0:
+                        # decrement available_ls_fu
+                        available_ls_fu = available_ls_fu - 1
 						# calculate address
-						# what to do with calculated address
-                    print "TODO ISSUE -> EX FOR LD AND SD"
+                        values = lsq.lsq_get_address_values(rob_entry)
+                        ls_address = values[0]*4 + values[1]
+                        # add calculated address to ls_buffer that will update lsq as soon as execution time is done
+                        ls_buffer.append({"destination" : rob_entry, "address" : ls_address, "ready_cycle" : cycle_counter + load_store_unit_properties["cycles_in_ex"]}.copy())
+                        #update stage info in rob
+                        rob.rob_update_state(rob_entry, "EX")
+                        #update stage infor in tt
+                        print "EX FOR " + rob_entry + ": L/S STARTS IN CYCLE " + str(cycle_counter) + " AND ENDS IN CYCLE " + str(cycle_counter + load_store_unit_properties["cycles_in_ex"]-1)
+                        timing_table.timing_table_update(rob.rob_get_tt_index(rob_entry), "EX", cycle_counter, load_store_unit_properties["cycles_in_ex"])
                         
-            rob_entry = rob.rob_next(rob_entry, rob_dest)
+            rob_entry = rob.rob_next(rob_entry, rob_dest) # get next rob entry
         
         #---------------------------------------------------------------------
         # WB -> COMMIT STAGE
@@ -390,7 +452,7 @@ def main(input_filename): # argv is a list of command line arguments
         #can_move_from_wb_to_commit = (!commit_in_use) & (rob_top_instruction_ready_to_commit)
         if rob.rob_check_if_ready_to_commit() != -1:
             #clear rob entry
-            rob_entry_data = rob.rob_commit() # [tt_index, destination, value, instruction_id]
+            rob_entry_data = rob.rob_commit() # [tt_index, destination, value, instruction_id, rob_entry_name]
             cycles_in_commit = 1
             if rob_entry_data[3] in ["ADD", "ADDI", "SUB", "ADD.D", "SUB.D", "MULT.D", "LD"]: 
                 #set arf buffer
@@ -401,6 +463,9 @@ def main(input_filename): # argv is a list of command line arguments
                 cycles_in_commit = load_store_unit_properties["cycles_in_mem"]
                 #set memory in use
                 memory_is_in_use = load_store_unit_properties["cycles_in_mem"]
+            #if rat still points to this ROB entry -> clean it up
+            if rat.rat_get(rob_entry_data[1]) == rob_entry_data[4]:
+                rat.rat_update(rob_entry_data[1], rob_entry_data[1])
             #update timing table
             timing_table.timing_table_update(rob_entry_data[0], "COMMIT", cycle_counter, cycles_in_commit)    
             print "COMMIT FOR " + rob_entry_data[1] + ": STARTS IN CYCLE " + str(cycle_counter) + " AND ENDS IN CYCLE " + str(cycle_counter + cycles_in_commit - 1)        
@@ -458,43 +523,6 @@ def input_file_decoder(input_filename):
         elif(line_not_split != "" and line[0] != "#"): # if it isn't 
             # instruction
             instruction_buffer.append(line_not_split)
-############################################################################################################
-
-############################################################################################################
-# CONTROL LOGIC
-############################################################################################################
-def control_logic():
-    # needs to be generated at the beginning of each cycle and will be used to make decisions for pipeline
-    
-    ######## 1) only for next instructin in buffer ########
-    
-    #can_issue_new_instuction = (available_instuction_in_instruction_buffer) &  (available_rs_entry) & (available_rob_entry)
-    
-    ######## 2) for each instruction in the issue stage going to ex stage ########
-    
-    #can_move_to_ex_stage = (alu_int_instruction) & (no_register_dependencies) & (available_int_fu) or (!alu_int_instruction) & (no_register_dependencies)
-    
-    ######## 3.1) for each instruction in the ex stage going to mem stage ########
-    
-    #can_move_from_ex_to_mem_stage = (ld_instuction) & ((cycle_counter-ex_s) == fu_execution_cycles) & (!memory_will_be_in_use_next_cycle)
-    
-    ######## 3.2) for each instruction in the ex stage going to wb stage ########
-    
-    #can_move_from_ex_to_wb_stage = (!ld_instuction) & ((cycle_counter-ex_s) == fu_execution_cycles) & (!cdb_will_be_in_use_next_cycle)
-    
-    ######## 4) for each instruction in the mem stage ########
-    
-    #can_move_from_mem_to_wb_stage = (forwarding_flag_set) & ((cycle_counter-mem_s) == 1)  & (!cdb_will_be_in_use_next_cycle) or (!forwarding_flag_set) & ((cycle_counter-mem_s) == fu_mem_cycles) & (!cdb_will_be_in_use_next_cycle)
-    
-    ######## 5) for each instruction in the wb stage ########
-    
-    #can_move_from_wb_to_commit = (!memory_will_be_in_use_next_cycle) & (rob_top_instruction_ready_to_commit)
-    
-    ######## 6) for each instruction in the commit stage waiting to exit pipeline ########
-       
-    #can_exit_pipeline = ((cycle_counter-mem_s) == fu_mem_cycles)
-    
-    print "CONTROL LOGIC TODO"
 ############################################################################################################
 
 ############################################################################################################
