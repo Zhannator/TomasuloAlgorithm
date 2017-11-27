@@ -9,8 +9,8 @@ class LSQobject:
     def lsq_initialize(self, num_load_store_rs):
         self.lsq_size = num_load_store_rs
     
-    def lsq_available():
-        if len(self.lsq) < lsq_size:
+    def lsq_available(self):
+        if len(self.lsq) < self.lsq_size:
             return 1
         else:
             return -1
@@ -22,7 +22,7 @@ class LSQobject:
         #when a LOAD entry is added, run through queue to see if older STORE instr (with same addr) will forward
         #   -> which earlier STORE do I get my value from?
 
-        if len(self.lsq) < num_load_store_rs:
+        if len(self.lsq) < self.lsq_size:
             lsq_entry = { 
                 "type" : ls_instr,    #Load or Store instruction (LD or SD)
                 "dest" : rob_dest,   #rob entry destination
@@ -39,43 +39,88 @@ class LSQobject:
             print "Load-Store Queue full!"
             return -1
     
+    def lsq_get_store_val(self, rob_entry):
+        for entry in self.lsq:
+            if entry["dest"] == rob_entry:
+                return entry["vj"]
+    
+    def lsq_update_value(self, rob_entry, value):
+        for index, entry in enumerate(self.lsq):
+            if entry["qj"] == rob_entry:
+                self.lsq[index]["vj"] = value
+                self.lsq[index]["qj"] = "-"
+            if entry["qk"] == rob_entry:
+                self.lsq[index]["vk"] = value
+                self.lsq[index]["qk"] = "-"
+    
+    def lsq_store_val_available(self, rob_entry):
+        for entry in self.lsq:
+            if entry["dest"] == rob_entry:
+                if entry["vj"] != "-":
+                    return 1
+                else:
+                    return -1
+    
     def lsq_addr_reg_ready(self, rob_entry):
         for entry in self.lsq:
             if entry["dest"] == rob_entry:
                 if entry["vk"] != "-":
+                    print "LSQ ADDRESS REG: " + str(entry["vk"])
                     return 1
                 else:
                     return -1
+        print "FAILED to FIND LSQ ENTRY: " + rob_entry
+        return -1
  
     def lsq_get_address_values(self, rob_entry):
         for entry in self.lsq:
             if entry["dest"] == rob_entry:
                 return [entry["constant"], entry["vk"]]
- 
+                                
+    def lsq_update_address(self, rob_entry, address):
+        for index, entry in enumerate(self.lsq):
+            if entry["dest"] == rob_entry:
+                self.lsq[index]["address"] = address
+                 
     def lsq_get_address(self, rob_entry):
         for entry in self.lsq:
             if entry["dest"] == rob_entry:
                 return entry["address"]
- 
-    def lsq_pop(self):
+                print "FOUND LSQ UPDATE ADDRESS: " + str(entry["address"])
+                
+    def lsq_dequeue(self, rob_entry):
         #pop the oldest instruction from the queue
-        self.lsq.pop()
-        print "TODO"
+        if self.lsq[0]["dest"] == rob_entry:
+            del self.lsq[0]
 
     def lsq_forwarding(self, rob_entry):
         # check if can forward a value to myself
+        entry_index = 0
         for index, entry in enumerate(self.lsq):
             if entry["dest"] == rob_entry:
                 entry_index = index
                 addr = entry["address"]
                 break
-        for index in range(entry_index - 1, 0, -1):
-            if self.lsq[index]["type"] == "SD" and self.lsq[index]["address"] == addr:
-                # forward if value is ready
-                if self.lsq[index]["vj"] != "-":
-                    self.lsq[entry_index]["value"] = self.lsq[index]["vj"]
-                    self.lsq[entry_index]["fwd"] = 1
-                    return 1
-                break
+        if entry_index != 0:
+            for index in range(entry_index - 1, 0, -1):
+                if self.lsq[index]["type"] == "SD" and self.lsq[index]["address"] == addr:
+                    # forward if value is ready
+                    if self.lsq[index]["vj"] != "-":
+                        self.lsq[entry_index]["value"] = self.lsq[index]["vj"]
+                        self.lsq[entry_index]["fwd"] = 1
+                        return 1
+                    break
         # if not return -1
         return -1
+
+    def lsq_print(self):
+        print "###############################################################################################################################################################"
+        print "{:^159}".format("LOAD STORE QUEUE")
+        print "###############################################################################################################################################################"    
+        column_names = ["DEST", "TYPE", "VSD", "QSD", "VAddr", "QAddr", "CONST", "ADDR", "VAL", "FWD"]
+        row_format ="{:^16}" * len(column_names)
+        print row_format.format(*column_names)
+        for index, lsq_entry in enumerate(self.lsq):
+            lsq_entry_list = [lsq_entry["dest"], lsq_entry["type"], lsq_entry["vj"], lsq_entry["qj"], lsq_entry["vk"], lsq_entry["qk"], lsq_entry["constant"], lsq_entry["address"], lsq_entry["value"], lsq_entry["fwd"]]
+            print row_format.format(*lsq_entry_list)
+        print  

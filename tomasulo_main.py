@@ -103,22 +103,20 @@ def main(input_filename): # argv is a list of command line arguments
             memory_is_in_use = memory_is_in_use - 1
             if memory_is_in_use == 0 and memory_buffer != []:
                 memory.mem_write(memory_buffer[0], memory_buffer[1])
-                memory_buffer = []
                 print "Update memory location " + str(memory_buffer[0]) + " to " + str(memory_buffer[1])
-        
+                memory_buffer = []
+                        
         # UPDATE ARFobject
         if arf_buffer != []:
             arf.reg_write(arf_buffer[0], arf_buffer[1])
             arf_buffer = []
         
         # CHECK CDB BUFFER
-        for index, entry in enumerate(cdb_buffer):
-            if cycle_counter >= (entry["ready_cycle"] + 1):
-                # update rs/rob
-                cdb_update(entry["destination"], entry["value"])
-                print "CDB UPDATE: " + entry["destination"] + ", " + str(entry["value"])
-                del cdb_buffer[index]
-                break
+        if len(cdb_buffer) > 0:
+            # update rs/rob
+            print "CDB UPDATE: " + cdb_buffer[0] + ", " + str(cdb_buffer[1])
+            cdb_update(cdb_buffer[0], cdb_buffer[1])
+            cdb_buffer = []
         
         # CHECK LS BUFFER
         for index, entry in enumerate(ls_buffer):
@@ -135,11 +133,12 @@ def main(input_filename): # argv is a list of command line arguments
         
         #############################
         #PRINTINT EVERY CYCLE
-        #rob.rob_print()
-        #rs.rs_print()
-        #timing_table.time_table_print()
-        #memory.mem_print_non_zero_values()
-        #arf.reg_print()
+        rob.rob_print()
+        rs.rs_print()
+        lsq.lsq_print()
+        timing_table.time_table_print()
+        memory.mem_print_non_zero_values()
+        arf.reg_print()
         
         # print results and exit if rob is empty and instruction_buffer is exerted
         if (rob.rob_empty() == 1) and ((PC/4) >= len(instruction_buffer)):
@@ -265,9 +264,21 @@ def main(input_filename): # argv is a list of command line arguments
                 # MEM -> WB
                 #---------------------------------------------------------------------
                 #can_move_from_mem_to_wb_stage = (forwarding_flag_set) & ((cycle_counter-mem_s) == 1)  & (!cdb_will_be_in_use_next_cycle) or (!forwarding_flag_set) & ((cycle_counter-mem_s) == fu_mem_cycles) & (!cdb_will_be_in_use_next_cycle)
-				mem_stage_done = (timing_table.timing_table_check_if_done(rob.rob_get_tt_index(rob_entry), "MEM", cycle_counter) == 1)
-                if mem_stage_done:
-                print "TODO MEM -> WB"
+                mem_stage_done = (timing_table.timing_table_check_if_done(rob.rob_get_tt_index(rob_entry), "MEM", cycle_counter) == 1)
+                if mem_stage_done and cdb_in_use == 0:
+                    # when mem stage done and cdb available -> cast loaded value on cdb to rob
+                    cdb_in_use = 1
+                    #write loaded value to a list of values loaded from memory
+                    result = memory.mem_read(lsq.lsq_get_address(rob_entry))
+                    #dequeue lsq
+                    lsq.lsq_dequeue(rob_entry) #MAY BE A PROBLEM (CHECK LATER - MAY NEED TO DO THIS BEFORE CYCLING THROUGH ROB) !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!                    
+                    # add result to cdb buffer                        
+                    cdb_buffer = [rob_entry, result]    
+                    # update rob state
+                    rob.rob_update_state(rob_entry, "WB")
+                    # update timing table
+                    print "WB FOR " + rob_entry + ": " + str(cycle_counter)
+                    timing_table.timing_table_update(rob.rob_get_tt_index(rob_entry), "WB", cycle_counter, 1)                    
             elif rob_entry_state == "EX" and rob_entry_instruction_id == "LD":  
                 #---------------------------------------------------------------------
                 # EX -> MEM
@@ -280,16 +291,16 @@ def main(input_filename): # argv is a list of command line arguments
                         #update timing table
                         print "MEM FOR " + rob_entry + ": LD STARTS IN CYCLE " + str(cycle_counter) + " AND ENDS IN CYCLE " + str(cycle_counter)
                         timing_table.timing_table_update(rob.rob_get_tt_index(rob_entry), "MEM", cycle_counter, 1)
+                        #update rob
+                        rob.rob_update_state(rob_entry, "MEM")
                     elif memory_is_in_use == 0:
                         #update timing table
+                        memory_is_in_use = load_store_unit_properties["cycles_in_mem"]
                         print "MEM FOR " + rob_entry + ": LD STARTS IN CYCLE " + str(cycle_counter) + " AND ENDS IN CYCLE " + str(cycle_counter + load_store_unit_properties["cycles_in_mem"]-1)
                         timing_table.timing_table_update(rob.rob_get_tt_index(rob_entry), "MEM", cycle_counter, load_store_unit_properties["cycles_in_mem"])
-                    #update rob
-                    rob.rob_update_state(rob_entry, "MEM")        
-                    
-                    # WHAT DO WE DO WITH VALUE FROM MEMORY? !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-                    value_loaded_from_memory = memory.mem_read(lsq.lsq_get_address(rob_entry))
-            elif rob_entry_state == "EX" and rob_entry_instruction_id != "LD":    
+                        #update rob
+                        rob.rob_update_state(rob_entry, "MEM")                        
+            elif rob_entry_state == "EX": # not ld instruction   
                 #---------------------------------------------------------------------
                 # EX -> WB STAGE
                 #---------------------------------------------------------------------            
@@ -304,6 +315,37 @@ def main(input_filename): # argv is a list of command line arguments
                     if rob_entry_instruction_id in ["ADD", "ADDI", "SUB", "ADD.D", "SUB.D", "MULT.D"]:
                         # normal writeback procedure
                         cdb_in_use = 1
+                        # write to cdb buffer
+                        if rob_entry_instruction_id in ["ADD", "ADDI"]:
+                            # perform addition
+                            values = rs.rs_get_values("int_adder_rs", rob_entry)
+                            result = values[0] + values[1]
+                            # add result to cdb buffer                        
+                            cdb_buffer = [rob_entry, result]
+                        elif rob_entry_instruction_id in ["SUB"]:
+                            # perform subtraction
+                            values = rs.rs_get_values("int_adder_rs", rob_entry)
+                            result = values[0] - values[1]
+                            # add result to cdb buffer
+                            cdb_buffer = [rob_entry, result]
+                        elif rob_entry_instruction_id == "ADD.D":
+                            # perform addition
+                            values = rs.rs_get_values("fp_adder_rs", rob_entry)
+                            result = float(values[0] + values[1])
+                            # add result to cdb buffer
+                            cdb_buffer = [rob_entry, result]
+                        elif rob_entry_instruction_id == "SUB.D":
+                            # perform addition
+                            values = rs.rs_get_values("fp_adder_rs", rob_entry)
+                            result = float(values[0] - values[1])
+                            # add result to cdb buffer
+                            cdb_buffer = [rob_entry, result]
+                        elif rob_entry_instruction_id == "MULT.D":
+                            # perform multiplication
+                            values = rs.rs_get_values("fp_multiplier_rs", rob_entry)
+                            result = float(values[0]*values[1])
+                            # add result to cdb buffer
+                            cdb_buffer = [rob_entry, result]
                         # clear rs entry
                         rs.rs_clear_entry(rob_entry)
                         # update rob state
@@ -311,8 +353,20 @@ def main(input_filename): # argv is a list of command line arguments
                         # update timing table
                         print "WB FOR " + rob_entry + ": " + str(cycle_counter)
                         timing_table.timing_table_update(rob.rob_get_tt_index(rob_entry), "WB", cycle_counter, 1)
+                    elif rob_entry_instruction_id in ["SD"]:
+                        #when value is available -> write value (source) field to rob
+                        if lsq.lsq_store_val_available(rob_entry) != -1:
+                            # normal writeback procedure
+                            cdb_in_use = 1
+                            # add value to cdb buffer
+                            cdb_buffer = [rob_entry, lsq.lsq_get_store_val(rob_entry)]                                               
+                            # update rob state
+                            rob.rob_update_state(rob_entry, "WB")
+                            # update timing table
+                            print "WB FOR " + rob_entry + ": " + str(cycle_counter)
+                            timing_table.timing_table_update(rob.rob_get_tt_index(rob_entry), "WB", cycle_counter, 1)
                     else:
-                        print "TODO WB FOR NON ALU"                    
+                        print "TODO WB FOR BRANCHES"                    
             elif rob_entry_state == "ISSUE":    
                 #---------------------------------------------------------------------
                 # ISSUE -> EX
@@ -324,11 +378,6 @@ def main(input_filename): # argv is a list of command line arguments
                     if no_dependencies and available_int_fu != 0:
                         # decrement available_int_fu
                         available_int_fu = available_int_fu - 1
-                        # perform addition
-                        values = rs.rs_get_values("int_adder_rs", rob_entry)
-                        result = values[0] + values[1]
-                        # add result to cdb buffer                        
-                        cdb_buffer.append({"destination" : rob_entry, "value" : result, "ready_cycle" : cycle_counter + int_adder_properties["cycles_in_ex"]}.copy())
                         #update stage info in rob
                         rob.rob_update_state(rob_entry, "EX")
                         #update stage infor in tt
@@ -340,11 +389,6 @@ def main(input_filename): # argv is a list of command line arguments
                     if no_dependencies and available_int_fu != 0:
 						# decrement available_int_fu
                         available_int_fu = available_int_fu - 1
-						# perform subtraction
-                        values = rs.rs_get_values("int_adder_rs", rob_entry)
-                        result = values[0] - values[1]
-						# add result to cdb buffer
-                        cdb_buffer.append({"destination" : rob_entry, "value" : result, "ready_cycle" : cycle_counter + int_adder_properties["cycles_in_ex"]}.copy())
                         #update stage info in rob
                         rob.rob_update_state(rob_entry, "EX")
                         #update stage infor in tt
@@ -356,11 +400,6 @@ def main(input_filename): # argv is a list of command line arguments
                     if no_dependencies and available_fp_adder_fu != 0:
 						# decrement available_fp_adder_fu
                         available_fp_adder_fu = available_fp_adder_fu - 1
-						# perform addition
-                        values = rs.rs_get_values("fp_adder_rs", rob_entry)
-                        result = float(values[0] + values[1])
-						# add result to cdb buffer
-                        cdb_buffer.append({"destination" : rob_entry, "value" : result, "ready_cycle" : cycle_counter + fp_adder_properties["cycles_in_ex"]}.copy())
                         #update stage info in rob
                         rob.rob_update_state(rob_entry, "EX")
                         #update stage infor in tt
@@ -372,11 +411,6 @@ def main(input_filename): # argv is a list of command line arguments
                     if no_dependencies and available_fp_adder_fu != 0:
 						# decrement available_fp_adder_fu
                         available_fp_adder_fu = available_fp_adder_fu - 1
-						# perform addition
-                        values = rs.rs_get_values("fp_adder_rs", rob_entry)
-                        result = float(values[0] - values[1])
-						# add result to cdb buffer
-                        cdb_buffer.append({"destination" : rob_entry, "value" : result, "ready_cycle" : cycle_counter + fp_adder_properties["cycles_in_ex"]}.copy())
                         #update stage info in rob
                         rob.rob_update_state(rob_entry, "EX")
                         #update stage infor in tt
@@ -388,11 +422,6 @@ def main(input_filename): # argv is a list of command line arguments
                     if no_dependencies and available_fp_mult_fu != 0:
 						# decrement available_fp_mult_fu
                         available_fp_mult_fu = available_fp_mult_fu - 1
-						# perform multiplication
-                        values = rs.rs_get_values("fp_multiplier_rs", rob_entry)
-                        result = float(values[0]*values[1])
-						# add result to cdb buffer
-                        cdb_buffer.append({"destination" : rob_entry, "value" : result, "ready_cycle" : cycle_counter + fp_multiplier_properties["cycles_in_ex"]}.copy())
                         #update stage info in rob
                         rob.rob_update_state(rob_entry, "EX")
                         #update stage infor in tt
@@ -435,9 +464,12 @@ def main(input_filename): # argv is a list of command line arguments
                         available_ls_fu = available_ls_fu - 1
 						# calculate address
                         values = lsq.lsq_get_address_values(rob_entry)
-                        ls_address = values[0]*4 + values[1]
+                        print "LSQ values: " + str(values)
+                        ls_address = int(values[0])*4 + int(values[1])
                         # add calculated address to ls_buffer that will update lsq as soon as execution time is done
                         ls_buffer.append({"destination" : rob_entry, "address" : ls_address, "ready_cycle" : cycle_counter + load_store_unit_properties["cycles_in_ex"]}.copy())
+                        # update ROB entry destination
+                        rob.rob_update_sd_destination(rob_entry, ls_address)
                         #update stage info in rob
                         rob.rob_update_state(rob_entry, "EX")
                         #update stage infor in tt
@@ -450,25 +482,34 @@ def main(input_filename): # argv is a list of command line arguments
         # WB -> COMMIT STAGE
         #---------------------------------------------------------------------
         #can_move_from_wb_to_commit = (!commit_in_use) & (rob_top_instruction_ready_to_commit)
-        if rob.rob_check_if_ready_to_commit() != -1:
-            #clear rob entry
-            rob_entry_data = rob.rob_commit() # [tt_index, destination, value, instruction_id, rob_entry_name]
-            cycles_in_commit = 1
+        rob_entry_data = rob.rob_check_if_ready_to_commit() # [tt_index, destination, value, instruction_id, rob_entry_name]
+        if rob_entry_data != -1:
             if rob_entry_data[3] in ["ADD", "ADDI", "SUB", "ADD.D", "SUB.D", "MULT.D", "LD"]: 
+                #clear rob entry
+                rob.rob_commit() # [tt_index, destination, value, instruction_id, rob_entry_name]
+                cycles_in_commit = 1
                 #set arf buffer
-                arf_buffer = [rob_entry_data[1], rob_entry_data[2]]
-            elif rob_entry_data[3] in ["SD"] and memory_is_in_use == 0:
+                arf_buffer = [rob_entry_data[1], rob_entry_data[2]] # [destination, value]
+                #if rat still points to this ROB entry -> clean it up
+                if rat.rat_get(rob_entry_data[1]) == rob_entry_data[4]:
+                    rat.rat_update(rob_entry_data[1], rob_entry_data[1])
+                #update timing table
+                timing_table.timing_table_update(rob_entry_data[0], "COMMIT", cycle_counter, cycles_in_commit)    
+                print "COMMIT FOR " + rob_entry_data[4] + ": STARTS IN CYCLE " + str(cycle_counter) + " AND ENDS IN CYCLE " + str(cycle_counter + cycles_in_commit - 1)
+            elif rob_entry_data[3] == "SD" and memory_is_in_use == 0:
+                #clear rob entry
+                rob.rob_commit() # [tt_index, destination, value, instruction_id, rob_entry_name]
+                cycles_in_commit = 1
                 #set memory_buffer
-                memory_buffer = [rob_entry_data[1], rob_entry_data[2]]
+                memory_buffer = [rob_entry_data[1], rob_entry_data[2]] # [destination, value]
                 cycles_in_commit = load_store_unit_properties["cycles_in_mem"]
                 #set memory in use
-                memory_is_in_use = load_store_unit_properties["cycles_in_mem"]
-            #if rat still points to this ROB entry -> clean it up
-            if rat.rat_get(rob_entry_data[1]) == rob_entry_data[4]:
-                rat.rat_update(rob_entry_data[1], rob_entry_data[1])
-            #update timing table
-            timing_table.timing_table_update(rob_entry_data[0], "COMMIT", cycle_counter, cycles_in_commit)    
-            print "COMMIT FOR " + rob_entry_data[1] + ": STARTS IN CYCLE " + str(cycle_counter) + " AND ENDS IN CYCLE " + str(cycle_counter + cycles_in_commit - 1)        
+                memory_is_in_use = load_store_unit_properties["cycles_in_mem"]                
+                #dequeue the lsq
+                lsq.lsq_dequeue(rob_entry)
+                #update timing table
+                timing_table.timing_table_update(rob_entry_data[0], "COMMIT", cycle_counter, cycles_in_commit)    
+                print "COMMIT FOR " + rob_entry_data[4] + ": STARTS IN CYCLE " + str(cycle_counter) + " AND ENDS IN CYCLE " + str(cycle_counter + cycles_in_commit - 1)        
         
     rob.rob_print()
     rs.rs_print() 
@@ -555,9 +596,9 @@ def cdb_update(destination, value):
     
     # check and update rs
     rs.rs_update_value(destination, value)
-    
+  
     # check and update load store queue
-    print "TODO CDB UPDATE FOR LOAD STORE QUEUE"
+    lsq.lsq_update_value(destination, value)
     
     # check and update rob
     rob.rob_update_value(destination, value)

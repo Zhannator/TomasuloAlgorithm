@@ -1,0 +1,17 @@
+int_adder 2 1 1
+fp_adder 3 3 1
+fp_multiplier 2 20 1
+load_store_unit 3 1 4 1
+rob_entries 10
+mem 4 3.3
+mem 8 2.2
+mem 12 3.4
+mem 16 5.5
+ld F1 1(R0)
+ld F2 2(R0)
+ld F3 3(R0)
+ld F4 4(R0)
+add.d F5 F1 F2
+add.d F6 F5 F3
+Sd F5 20(R0)
+Sd F6 24(R0)

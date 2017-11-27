@@ -65,28 +65,31 @@ class ROBobject:
 
         if self.rob_total_entries != 0 and self.rob[self.rob_check_counter]["busy"] == "no":
             #if ready to commit -> clear entry and return [destination, value]
+            # return_value = [tt_index, destination, value, instruction_id, rob_entry_name]
+            return_value = [self.rob[self.rob_check_counter]["timing_table_entry_index"], self.rob[self.rob_check_counter]["destination"], self.rob[self.rob_check_counter]["value"], self.rob[self.rob_check_counter]["instruction"].split(" ")[0], "ROB"+str(self.rob_check_counter)]
             print "ROB" + str(self.rob_check_counter) + " is ready to commit"           
-            return 1
+            print return_value
+            return return_value
         else:
             return -1
 
     def rob_commit(self):
-        # return_value = [tt_index, destination, value, instruction_id, rob_entry_name]
-        return_value = [self.rob[self.rob_check_counter]["timing_table_entry_index"], self.rob[self.rob_check_counter]["destination"], self.rob[self.rob_check_counter]["value"], self.rob[self.rob_check_counter]["instruction"].split(" ")[0], "ROB"+str(self.rob_check_counter)]
         self.rob[self.rob_check_counter] = self.rob_empty_entry.copy()
         if self.rob_check_counter + 1 == len(self.rob):
             self.rob_check_counter = 0
         else:
             self.rob_check_counter = self.rob_check_counter + 1
         self.rob_total_entries = self.rob_total_entries - 1
-        print return_value
-        return return_value
             
     def rob_get_instruction_id(self, rob_entry):
         return self.rob[int(rob_entry.split("ROB")[1])]["instruction"].split(" ")[0]
             
     def rob_get_destination(self, rob_entry):
         return self.rob[int(rob_entry.split("ROB")[1])]["destination"]
+    
+    def rob_update_sd_destination(self, rob_entry, ls_address):
+        if self.rob[int(rob_entry.split("ROB")[1])]["instruction"].split(" ")[0] == "SD":
+            self.rob[int(rob_entry.split("ROB")[1])]["destination"] = ls_address
     
     def rob_get_value(self, rob_entry):
         return self.rob[int(rob_entry.split("ROB")[1])]["value"]
@@ -119,7 +122,7 @@ class ROBobject:
             rob_add_counter_previous = len(self.rob) - 1
         else:
             rob_add_counter_previous = self.rob_add_counter - 1
-        if (self.rob_check_counter == self.rob_add_counter) or (instruction_issue_indicator != "-" and self.rob_check_counter == rob_add_counter_previous): #returns -1 if there ROB is empty
+        if (self.rob_check_counter == self.rob_add_counter) or (instruction_issue_indicator != "-" and self.rob_check_counter == rob_add_counter_previous): #returns -1 if there ROB is empty or contains an instruction that was just issued
             return -1
         else:
             return "ROB" + str(self.rob_check_counter)
