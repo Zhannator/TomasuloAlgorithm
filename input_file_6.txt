@@ -1,0 +1,21 @@
+int_adder 2 1 1
+fp_adder 3 3 1
+fp_multiplier 3 20 1
+load_store_unit 3 1 4 1
+rob_entries 128
+reg F1 0
+reg F2 1.1
+reg F3 2.5
+reg F4 0.0
+reg F5 1.5
+reg F6 1.5
+reg F7 0
+reg F8 3.5
+reg F9 3.5
+reg F10 0
+reg F11 5.5
+reg F12 5.5
+mult.d F1 F2 F3
+mult.d F4 F5 F6
+mult.d F7 F8 F9
+mult.d F10 F11 F12
