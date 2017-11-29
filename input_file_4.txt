@@ -10,7 +10,6 @@ mem 4 3
 mem 8 2
 mem 12 3.4
 Mem 16 5.5
-Addi R1 R0 0
-Sd F1 1(R1)
-Ld F2 1(R1)
+Sd F1 1(R0)
+Ld F2 1(R0)
 Ld F3 1(R0)

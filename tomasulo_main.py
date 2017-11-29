@@ -99,10 +99,13 @@ def main(input_filename): # argv is a list of command line arguments
         available_fp_mult_fu = fp_multiplier_properties["num_fus"] # fp fus are pipelined, this number corresponds to how many fp mult instructions can be moved to ex stage in the same cycle
 		
         # UPDATE MEMORY USAGE
+        #print "********* MEMORY BUFFER: " + str(memory_buffer) + " *********"
         if memory_is_in_use != 0:
             memory_is_in_use = memory_is_in_use - 1
             if memory_is_in_use == 0 and memory_buffer != []:
                 memory.mem_write(memory_buffer[0], memory_buffer[1])
+                #dequeue the lsq
+                lsq.lsq_dequeue(memory_buffer[2])
                 print "Update memory location " + str(memory_buffer[0]) + " to " + str(memory_buffer[1])
                 memory_buffer = []
                         
@@ -133,18 +136,19 @@ def main(input_filename): # argv is a list of command line arguments
         
         #############################
         #PRINTINT EVERY CYCLE
+        #############################
         rob.rob_print()
-        rs.rs_print()
+        #rs.rs_print()
         lsq.lsq_print()
         timing_table.time_table_print()
-        memory.mem_print_non_zero_values()
-        arf.reg_print()
+        #memory.mem_print_non_zero_values()
+        #arf.reg_print()
         
         # print results and exit if rob is empty and instruction_buffer is exerted
-        if (rob.rob_empty() == 1) and ((PC/4) >= len(instruction_buffer)):
-            timing_table.time_table_print()
-            arf.reg_print()
-            memory.mem_print_non_zero_values()                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      
+        if (rob.rob_empty() == 1) and ((PC/4) >= len(instruction_buffer)) and (memory_is_in_use == 0):
+            #timing_table.time_table_print()
+            #arf.reg_print()
+            #memory.mem_print_non_zero_values()                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      
             break
         
         print "-------------------------- CYCLE " + str(cycle_counter) + " --------------------------"
@@ -501,21 +505,16 @@ def main(input_filename): # argv is a list of command line arguments
                 rob.rob_commit() # [tt_index, destination, value, instruction_id, rob_entry_name]
                 cycles_in_commit = 1
                 #set memory_buffer
-                memory_buffer = [rob_entry_data[1], rob_entry_data[2]] # [destination, value]
+                memory_buffer = [rob_entry_data[1], rob_entry_data[2], rob_entry_data[4]] # [destination, value, rob_entry]
                 cycles_in_commit = load_store_unit_properties["cycles_in_mem"]
                 #set memory in use
                 memory_is_in_use = load_store_unit_properties["cycles_in_mem"]                
                 #dequeue the lsq
-                lsq.lsq_dequeue(rob_entry)
+                #lsq.lsq_dequeue(rob_entry_data[4])
                 #update timing table
                 timing_table.timing_table_update(rob_entry_data[0], "COMMIT", cycle_counter, cycles_in_commit)    
                 print "COMMIT FOR " + rob_entry_data[4] + ": STARTS IN CYCLE " + str(cycle_counter) + " AND ENDS IN CYCLE " + str(cycle_counter + cycles_in_commit - 1)        
         
-    rob.rob_print()
-    rs.rs_print() 
-    timing_table.time_table_print()
-    memory.mem_print_non_zero_values()
-    arf.reg_print()
 ############################################################################################################
 
 ############################################################################################################

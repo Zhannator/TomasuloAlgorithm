@@ -94,6 +94,7 @@ class LSQobject:
             del self.lsq[0]
 
     def lsq_forwarding(self, rob_entry):
+        print "FORWARDING FUNCTION: "
         # check if can forward a value to myself
         entry_index = 0
         for index, entry in enumerate(self.lsq):
@@ -101,16 +102,22 @@ class LSQobject:
                 entry_index = index
                 addr = entry["address"]
                 break
+        print "FORWARDING INDEX: " + str(entry_index)
         if entry_index != 0:
-            for index in range(entry_index - 1, 0, -1):
+            for index in range(entry_index - 1, -1, -1):
+                print "LSQ INDEX: " + str(index)
                 if self.lsq[index]["type"] == "SD" and self.lsq[index]["address"] == addr:
                     # forward if value is ready
+                    print "FORWARDING LSQ INDEX: " + str(index) + " - FOUNT STORE INSTR WITH THE SAME ADDR"
                     if self.lsq[index]["vj"] != "-":
                         self.lsq[entry_index]["value"] = self.lsq[index]["vj"]
+                        print "FORWARDING with " + str(self.lsq[index]["vj"])
                         self.lsq[entry_index]["fwd"] = 1
                         return 1
+                        print "FORWARDING FOUND"
                     break
         # if not return -1
+        print "FORWARDING NOT FOUND"
         return -1
 
     def lsq_print(self):

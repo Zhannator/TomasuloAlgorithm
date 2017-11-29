@@ -3,12 +3,14 @@ int_adder 2 1 2
 fp_adder 3 3 1
 fp_multiplier 2 20 1
 # FU_name #_of_rs cycles_in_EX cycles_in_mem #_of_FUs
-load_store_unit 3 5 4 1
+load_store_unit 3 3 4 1
 # rob_entries #_of_rob_entries
 rob_entries 10
 # reg reg_name reg_value
-reg R1 4
+reg F1 4.4
 # mem mem_address mem_value
-mem 4 1
+# mem 4 1
 # instructions
-Ld F1 0(R1)
+ADDI R1 R0 0
+SD F1 0(R1)
+LD F2 0(R0)
