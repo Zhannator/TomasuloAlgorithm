@@ -79,10 +79,10 @@ def main(input_filename): # argv is a list of command line arguments
     memory_buffer = [] # [address, value]
     cdb_in_use = 0 # will be 1 or 0
     arf_buffer = []
-    # cdb_buffer_entry = {"destination" : "-", "value" : "-", "ready_cycle" : "-" # minimum cycle on which this information can be released }
     cdb_buffer = [] # treated as a priority queue, older buffer entries are at the top (smaller index)
     ls_buffer = [] # once addresses are calculated -> they are written to lsq_add
-    
+    stall_instruction_buffer = 0 # is 1 when want to stall instruction buffer
+    branch_buffer = [] # [branch resolution, ready_cycle, rob_entry]
     #-------------------------------------------------
     # PIPELINE
     #-------------------------------------------------
@@ -134,21 +134,32 @@ def main(input_filename): # argv is a list of command line arguments
         if cdb_in_use == 1:
             cdb_in_use = 0
         
+        # CHECK BRANCH BUFFER
+        if branch_buffer != []:
+            branch_buffer[1] = branch_buffer[1] -1
+            if branch_buffer[1] == 0:# [branch resolution, ready_cycle, rob_entry]
+                stall_instruction_buffer = 0
+                if branch_buffer[0] == 1:
+                    #set new PC
+                    PC = int(rob.rob_get_destination(branch_buffer[2]))
+                branch_buffer = []
+                            
+        
         #############################
         #PRINTINT EVERY CYCLE
         #############################
-        rob.rob_print()
+        #rob.rob_print()
         #rs.rs_print()
-        lsq.lsq_print()
-        timing_table.time_table_print()
+        #lsq.lsq_print()
+        #timing_table.time_table_print()
         #memory.mem_print_non_zero_values()
         #arf.reg_print()
         
         # print results and exit if rob is empty and instruction_buffer is exerted
         if (rob.rob_empty() == 1) and ((PC/4) >= len(instruction_buffer)) and (memory_is_in_use == 0):
-            #timing_table.time_table_print()
-            #arf.reg_print()
-            #memory.mem_print_non_zero_values()                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      
+            timing_table.time_table_print()
+            arf.reg_print()
+            memory.mem_print_non_zero_values()                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      
             break
         
         print "-------------------------- CYCLE " + str(cycle_counter) + " --------------------------"
@@ -164,7 +175,7 @@ def main(input_filename): # argv is a list of command line arguments
         #print "available_instuction_in_instruction_buffer: " + str(available_instuction_in_instruction_buffer)
         available_rob_entry = (rob.rob_available() == 1)
         #print "available_rob_entry: " + str(available_rob_entry)
-        if available_instuction_in_instruction_buffer and available_rob_entry:
+        if stall_instruction_buffer == 0 and available_instuction_in_instruction_buffer and available_rob_entry:
             # get insturction
             instruction = instruction_buffer[(PC/4)]
             print "issued instruction: " + instruction
@@ -177,11 +188,13 @@ def main(input_filename): # argv is a list of command line arguments
                     # add entry
                     # check if we have values of qj and qk
                     if instruction_id in ["BEQ", "BNE"]:
-                        # handle branch instructions 
+                        # handle branch instructions
+                        stall_instruction_buffer = 1 # stall issuing instructions temporarily until branch is resolved
                         reg1 = get_current_reg_info(instruction_parsed[1]) # reg_name
                         reg2 = get_current_reg_info(instruction_parsed[2]) # reg_name
-                        rob_dest = rob.rob_instr_add(instruction, "-", timing_table_entry_index)
-                        rat.int_rat_update(instruction_parsed[1], rob_dest) # need to update rat
+                        branch_dest = PC + int(instruction_parsed[3])*4 #PC+4+offset<<2
+                        rob_dest = rob.rob_instr_add(instruction, branch_dest, timing_table_entry_index)
+                        # RAT doesn't need updating for branch: rat.int_rat_update(instruction_parsed[1], rob_dest) # need to update rat
                     else:
                         reg1 = get_current_reg_info(instruction_parsed[2]) # reg_name
                         if instruction_id in ["ADDI"]:
@@ -272,8 +285,11 @@ def main(input_filename): # argv is a list of command line arguments
                 if mem_stage_done and cdb_in_use == 0:
                     # when mem stage done and cdb available -> cast loaded value on cdb to rob
                     cdb_in_use = 1
-                    #write loaded value to a list of values loaded from memory
-                    result = memory.mem_read(lsq.lsq_get_address(rob_entry))
+                    if lsq.lsq_fwd_flag_set(rob_entry) == 1:
+                        result = lsq.lsq_get_fwd_value(rob_entry)
+                    else:
+                        #write loaded value to a list of values loaded from memory
+                        result = memory.mem_read(lsq.lsq_get_address(rob_entry))
                     #dequeue lsq
                     lsq.lsq_dequeue(rob_entry) #MAY BE A PROBLEM (CHECK LATER - MAY NEED TO DO THIS BEFORE CYCLING THROUGH ROB) !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!                    
                     # add result to cdb buffer                        
@@ -310,7 +326,15 @@ def main(input_filename): # argv is a list of command line arguments
                 #---------------------------------------------------------------------            
                 #can_move_from_ex_to_wb_stage = (!ld_instuction) & ((cycle_counter-ex_s) == fu_execution_cycles) & (!cdb_will_be_in_use_next_cycle)
                 ex_stage_done = (timing_table.timing_table_check_if_done(rob.rob_get_tt_index(rob_entry), "EX", cycle_counter) == 1)
-                if ex_stage_done and cdb_in_use == 0:
+                if ex_stage_done and rob_entry_instruction_id in ["BEQ", "BNE"]:
+                    # clear rs entry
+                    rs.rs_clear_entry(rob_entry)
+                    # update rob state
+                    rob.rob_update_state(rob_entry, "WB")
+                    # update timing table
+                    print "WB FOR " + rob_entry + ": " + str(cycle_counter)
+                    timing_table.timing_table_update(rob.rob_get_tt_index(rob_entry), "WB", cycle_counter, 1)
+                elif ex_stage_done and cdb_in_use == 0:
                     # move to wb stage
                     if rob_entry_instruction_id in ["ADD", "ADDI", "SUB", "BEQ", "BNE"]:
                         #increment available available_int_fu
@@ -368,9 +392,7 @@ def main(input_filename): # argv is a list of command line arguments
                             rob.rob_update_state(rob_entry, "WB")
                             # update timing table
                             print "WB FOR " + rob_entry + ": " + str(cycle_counter)
-                            timing_table.timing_table_update(rob.rob_get_tt_index(rob_entry), "WB", cycle_counter, 1)
-                    else:
-                        print "TODO WB FOR BRANCHES"                    
+                            timing_table.timing_table_update(rob.rob_get_tt_index(rob_entry), "WB", cycle_counter, 1)                
             elif rob_entry_state == "ISSUE":    
                 #---------------------------------------------------------------------
                 # ISSUE -> EX
@@ -431,32 +453,18 @@ def main(input_filename): # argv is a list of command line arguments
                         #update stage infor in tt
                         print "EX FOR " + rob_entry + ": SUB.D STARTS IN CYCLE " + str(cycle_counter) + " AND ENDS IN CYCLE " + str(cycle_counter + fp_multiplier_properties["cycles_in_ex"]-1)
                         timing_table.timing_table_update(rob.rob_get_tt_index(rob_entry), "EX", cycle_counter, fp_multiplier_properties["cycles_in_ex"])
-                elif rob_entry_instruction_id == "BEQ": # resolve branch using int adder
+                elif rob_entry_instruction_id in ["BEQ", "BNE"]: # resolve branch using int adder
 					# find rs entry (by using ROB entry name)
                     no_dependencies = (rs.rs_no_dependencies("int_adder_rs", rob_entry) != -1)
                     if no_dependencies and available_int_fu != 0:
 						# decrement available_int_fu
-                        available_int_fu = available_int_fu - 1
-						# perform subtraction
+                        available_int_fu = available_int_fu - 1                       
+                        #resolve branch
                         values = rs.rs_get_values("int_adder_rs", rob_entry)
-                        result = (values[0] == values[1])
-						# add result to branch buffer
-                        print "TODO UPDATE BRANCH BUFFER"
-                        #update stage info in rob
-                        rob.rob_update_state(rob_entry, "EX")
-                        #update stage infor in tt
-                        timing_table.timing_table_update(rob.rob_get_tt_index(rob_entry), "EX", cycle_counter, int_adder_properties["cycles_in_ex"])
-                elif rob_entry_instruction_id == "BNE": # resolve branch using int adder
-					# find rs entry (by using ROB entry name)
-                    no_dependencies = (rs.rs_no_dependencies("int_adder_rs", rob_entry) != -1)
-                    if no_dependencies and available_int_fu != 0:
-						# decrement available_int_fu
-                        available_int_fu = available_int_fu - 1
-						# perform subtraction
-                        values = rs.rs_get_values("int_adder_rs", rob_entry)
-                        result = (values[0] != values[1])
-						# add result to cdb buffer
-                        print "TODO UPDATE BRANCH BUFFER"
+                        if rob_entry_instruction_id == "BEQ":
+                            branch_buffer = [(values[0] == values[1]), int_adder_properties["cycles_in_ex"], rob_entry] # resolution, ready_cycle, rob_entry
+                        elif rob_entry_instruction_id == "BNE":
+                            branch_buffer = [(values[0] != values[1]), int_adder_properties["cycles_in_ex"], rob_entry] # resolution, ready_cycle, rob_entry     
                         #update stage info in rob
                         rob.rob_update_state(rob_entry, "EX")
                         #update stage infor in tt
@@ -514,7 +522,13 @@ def main(input_filename): # argv is a list of command line arguments
                 #update timing table
                 timing_table.timing_table_update(rob_entry_data[0], "COMMIT", cycle_counter, cycles_in_commit)    
                 print "COMMIT FOR " + rob_entry_data[4] + ": STARTS IN CYCLE " + str(cycle_counter) + " AND ENDS IN CYCLE " + str(cycle_counter + cycles_in_commit - 1)        
-        
+            elif rob_entry_data[3] in ["BEQ", "BNE"]:
+                #clear rob entry
+                rob.rob_commit() # [tt_index, destination, value, instruction_id, rob_entry_name]
+                cycles_in_commit = 1
+                #update timing table
+                timing_table.timing_table_update(rob_entry_data[0], "COMMIT", cycle_counter, cycles_in_commit)    
+                print "COMMIT FOR " + rob_entry_data[4] + ": STARTS IN CYCLE " + str(cycle_counter) + " AND ENDS IN CYCLE " + str(cycle_counter + cycles_in_commit - 1)
 ############################################################################################################
 
 ############################################################################################################

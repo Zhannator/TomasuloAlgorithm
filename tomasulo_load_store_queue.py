@@ -93,6 +93,19 @@ class LSQobject:
         if self.lsq[0]["dest"] == rob_entry:
             del self.lsq[0]
 
+    def lsq_get_fwd_value(self, rob_entry):
+        for entry in self.lsq:
+            if entry["dest"] == rob_entry:
+                return entry["value"]
+            
+    def lsq_fwd_flag_set(self, rob_entry):
+        for entry in self.lsq:
+            if entry["dest"] == rob_entry:
+                if entry["fwd"] == 1:
+                    return 1
+                else:
+                    return -1
+    
     def lsq_forwarding(self, rob_entry):
         print "FORWARDING FUNCTION: "
         # check if can forward a value to myself
