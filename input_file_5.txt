@@ -3,8 +3,8 @@ fp_adder 3 3 1
 fp_multiplier 2 20 1
 load_store_unit 3 1 4 1
 rob_entries 10
-reg R1 3
-reg R2 0
+reg R1 0
+reg R2 2
 reg F1 0 
 reg F2 1.1
 reg F3 2.5

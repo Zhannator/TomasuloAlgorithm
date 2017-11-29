@@ -93,7 +93,7 @@ def main(input_filename): # argv is a list of command line arguments
     while(1):
 		# INCREMENT CYCLE
         cycle_counter = cycle_counter + 1
-
+        
         # RESET number of available fp fus
         available_fp_adder_fu = fp_adder_properties["num_fus"] # fp fus are pipelined, this number corresponds to how many fp adder instructions can be moved to ex stage in the same cycle; incremented when
         available_fp_mult_fu = fp_multiplier_properties["num_fus"] # fp fus are pipelined, this number corresponds to how many fp mult instructions can be moved to ex stage in the same cycle
@@ -142,7 +142,11 @@ def main(input_filename): # argv is a list of command line arguments
                 if branch_buffer[0] == 1:
                     #set new PC
                     PC = int(rob.rob_get_destination(branch_buffer[2]))
+                    print "BRANCH MUST BE TAKEN"
+                else:
+                    print "BRANCH MUST NOT BE TAKEN"
                 branch_buffer = []
+                available_int_fu = available_int_fu + 1
                             
         
         #############################
@@ -192,7 +196,7 @@ def main(input_filename): # argv is a list of command line arguments
                         stall_instruction_buffer = 1 # stall issuing instructions temporarily until branch is resolved
                         reg1 = get_current_reg_info(instruction_parsed[1]) # reg_name
                         reg2 = get_current_reg_info(instruction_parsed[2]) # reg_name
-                        branch_dest = PC + int(instruction_parsed[3])*4 #PC+4+offset<<2
+                        branch_dest = PC + 4 + int(instruction_parsed[3])*4 #PC+4+offset<<2
                         rob_dest = rob.rob_instr_add(instruction, branch_dest, timing_table_entry_index)
                         # RAT doesn't need updating for branch: rat.int_rat_update(instruction_parsed[1], rob_dest) # need to update rat
                     else:
@@ -331,6 +335,8 @@ def main(input_filename): # argv is a list of command line arguments
                     rs.rs_clear_entry(rob_entry)
                     # update rob state
                     rob.rob_update_state(rob_entry, "WB")
+                    # update rob and set busy to no
+                    rob.rob_update_value(rob_entry, "-")
                     # update timing table
                     print "WB FOR " + rob_entry + ": " + str(cycle_counter)
                     timing_table.timing_table_update(rob.rob_get_tt_index(rob_entry), "WB", cycle_counter, 1)
@@ -463,8 +469,10 @@ def main(input_filename): # argv is a list of command line arguments
                         values = rs.rs_get_values("int_adder_rs", rob_entry)
                         if rob_entry_instruction_id == "BEQ":
                             branch_buffer = [(values[0] == values[1]), int_adder_properties["cycles_in_ex"], rob_entry] # resolution, ready_cycle, rob_entry
+                            print "Branch formula: " + str(values[0]) + " == " + str(values[1])
                         elif rob_entry_instruction_id == "BNE":
                             branch_buffer = [(values[0] != values[1]), int_adder_properties["cycles_in_ex"], rob_entry] # resolution, ready_cycle, rob_entry     
+                            print "Branch formula: " + str(values[0]) + " != " + str(values[1])
                         #update stage info in rob
                         rob.rob_update_state(rob_entry, "EX")
                         #update stage infor in tt
