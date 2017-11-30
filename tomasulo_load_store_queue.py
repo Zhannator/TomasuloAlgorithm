@@ -36,7 +36,7 @@ class LSQobject:
                 "fwd" : "-"}    #Set flag if forwarding used 
             self.lsq.append(lsq_entry.copy())
         else:
-            print "Load-Store Queue full!"
+            #print "Load-Store Queue full!"
             return -1
     
     def lsq_get_store_val(self, rob_entry):
@@ -65,11 +65,11 @@ class LSQobject:
         for entry in self.lsq:
             if entry["dest"] == rob_entry:
                 if entry["vk"] != "-":
-                    print "LSQ ADDRESS REG: " + str(entry["vk"])
+                    #print "LSQ ADDRESS REG: " + str(entry["vk"])
                     return 1
                 else:
                     return -1
-        print "FAILED to FIND LSQ ENTRY: " + rob_entry
+        #print "FAILED to FIND LSQ ENTRY: " + rob_entry
         return -1
  
     def lsq_get_address_values(self, rob_entry):
@@ -86,7 +86,7 @@ class LSQobject:
         for entry in self.lsq:
             if entry["dest"] == rob_entry:
                 return entry["address"]
-                print "FOUND LSQ UPDATE ADDRESS: " + str(entry["address"])
+                #print "FOUND LSQ UPDATE ADDRESS: " + str(entry["address"])
                 
     def lsq_dequeue(self, rob_entry):
         #pop the oldest instruction from the queue
@@ -107,7 +107,7 @@ class LSQobject:
                     return -1
     
     def lsq_forwarding(self, rob_entry):
-        print "FORWARDING FUNCTION: "
+        #print "FORWARDING FUNCTION: "
         # check if can forward a value to myself
         entry_index = 0
         for index, entry in enumerate(self.lsq):
@@ -115,22 +115,22 @@ class LSQobject:
                 entry_index = index
                 addr = entry["address"]
                 break
-        print "FORWARDING INDEX: " + str(entry_index)
+        #print "FORWARDING INDEX: " + str(entry_index)
         if entry_index != 0:
             for index in range(entry_index - 1, -1, -1):
-                print "LSQ INDEX: " + str(index)
+                #print "LSQ INDEX: " + str(index)
                 if self.lsq[index]["type"] == "SD" and self.lsq[index]["address"] == addr:
                     # forward if value is ready
-                    print "FORWARDING LSQ INDEX: " + str(index) + " - FOUNT STORE INSTR WITH THE SAME ADDR"
+                    #print "FORWARDING LSQ INDEX: " + str(index) + " - FOUNT STORE INSTR WITH THE SAME ADDR"
                     if self.lsq[index]["vj"] != "-":
                         self.lsq[entry_index]["value"] = self.lsq[index]["vj"]
-                        print "FORWARDING with " + str(self.lsq[index]["vj"])
+                        #print "FORWARDING with " + str(self.lsq[index]["vj"])
                         self.lsq[entry_index]["fwd"] = 1
                         return 1
-                        print "FORWARDING FOUND"
+                        #print "FORWARDING FOUND"
                     break
         # if not return -1
-        print "FORWARDING NOT FOUND"
+        #print "FORWARDING NOT FOUND"
         return -1
 
     def lsq_print(self):
