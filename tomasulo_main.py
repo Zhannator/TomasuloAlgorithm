@@ -146,7 +146,8 @@ def main(input_filename): # argv is a list of command line arguments
                 branch_buffer = []
                 available_int_fu = available_int_fu + 1
                 #print "INCREASE AVAILABLE INT FU"
-           
+         
+        # CHECK INTEGER ADDER FUS AVAILABILITY
         if cycle_counter in int_adder_fu_timer:
             #increment available available_int_fu
             available_int_fu = available_int_fu + 1 
@@ -174,7 +175,7 @@ def main(input_filename): # argv is a list of command line arguments
         # SEPARATE FROM ROB
         
         #---------------------------------------------------------------------
-        # ISSUE STAGE START
+        # ISSUE STAGE
         #---------------------------------------------------------------------
         # can_issue_new_instuction = (available_instuction_in_instruction_buffer) & (available_rob_entry) &  (available_rs_entry)
         rob_dest = "-" # signifies that an instruction wasn't issued on this cycle if stays to be "-"
@@ -276,10 +277,6 @@ def main(input_filename): # argv is a list of command line arguments
             else:
                 print "Invalid instuction!"
                 exit(1)
-        
-        #---------------------------------------------------------------------
-        # ISSUE STAGE END
-        #---------------------------------------------------------------------
  
         # cycle through ROB
         rob_entry = rob.rob_head_node(rob_dest) 
@@ -534,8 +531,6 @@ def main(input_filename): # argv is a list of command line arguments
                 cycles_in_commit = load_store_unit_properties["cycles_in_mem"]
                 #set memory in use
                 memory_is_in_use = load_store_unit_properties["cycles_in_mem"]                
-                #dequeue the lsq
-                #lsq.lsq_dequeue(rob_entry_data[4])
                 #update timing table
                 timing_table.timing_table_update(rob_entry_data[0], "COMMIT", cycle_counter, cycles_in_commit)    
                 #print "COMMIT FOR " + rob_entry_data[4] + ": STARTS IN CYCLE " + str(cycle_counter) + " AND ENDS IN CYCLE " + str(cycle_counter + cycles_in_commit - 1)        
