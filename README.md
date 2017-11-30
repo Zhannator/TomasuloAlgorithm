@@ -4,15 +4,7 @@ Tomasulo Algorithm implementation using Python
 #################################################################################
 CONFIGURATIONS SET FROM input_file.txt
 #################################################################################
-1. number of ROB entries 
-2. number of reservation stations for each function unit
-3. number of cycles for EX stage for each function unit
-4. number of cycles for memory access 
-5. number of ROB enties
-6. set register values
-7. set memory values
-8. instructions
-#################################################################################
+number of ROB entries, number of reservation stations for each function unit, number of cycles for EX stage for each function unit, number of cycles for memory access, number of ROB enties, register values, memory values, instructions
 
 #################################################################################
 INSTRUCTION SET ARCHITECTURE
@@ -30,22 +22,11 @@ ALU Instructions
     Sub Rd, Rs, Rt	Rd = Rs - Rt	Integer
     Sub.d Fd, Fs, Ft	Fd = Fs – Ft	FP
     Mult.d Fd, Fs, Ft	Fd = Fs * Ft, assume Fd is enough to hold the result FP
-#################################################################################
 
 #################################################################################
 PIPELINE STAGES:
 #################################################################################
- ISSUE: instruction fetch and decode,
-        branch instructions are issued into int_adder_rs
-    EX: calculates addresses for loads and stores, branch resolution, 
-        uses load/store queue and doesn't occupy integer ALU
-   MEM: load can go to mem if no forwarding-from-a-store was found,
-        takes 1 cycle to perform the forwarding if a match is found,
-        load gets the value and clears its entry in the queue
-    WB: broadcast results on CDB, write back to RS and ROB, mark ready bit in ROB
-COMMIT: when instruction is the oldest in ROB, store writes to memory (dequed)/
-        write results to ARF, advance ROB head to next instruction 
-#################################################################################
+ISSUE, EX, MEM, WB, COMMIT
 
 #################################################################################
 PROCESSOR COMPONENTS:
@@ -60,7 +41,6 @@ PROCESSOR COMPONENTS:
 1 Reorder Buffer (ROB): rob
 1 load/store queue (similar to reservation station for memory unit,
   contains address and value (not useful for loads)): load_store_queue
-#################################################################################
 
 #################################################################################
 HARDWARE UNITS
@@ -70,4 +50,3 @@ FP adder; pipelined
 FP multiplier; pipelined
 Integer and FP register files, 32 entries each. Integer R0 is hardwired to 0.
 Memory; single-ported; non-pipelined
-#################################################################################

@@ -122,7 +122,7 @@ class ROBobject:
             rob_add_counter_previous = len(self.rob) - 1
         else:
             rob_add_counter_previous = self.rob_add_counter - 1
-        if (self.rob_check_counter == self.rob_add_counter) or (instruction_issue_indicator != "-" and self.rob_check_counter == rob_add_counter_previous): #returns -1 if there ROB is empty or contains an instruction that was just issued
+        if (self.rob_total_entries == 0) or (instruction_issue_indicator != "-" and self.rob_check_counter == rob_add_counter_previous): #returns -1 if there ROB is empty or contains an instruction that was just issued
             return -1
         else:
             return "ROB" + str(self.rob_check_counter)
@@ -134,8 +134,6 @@ class ROBobject:
                 rob_index = 0
         else:
             rob_index = rob_index + 1
-        
-        
         if self.rob_add_counter == 0:
             rob_add_counter_previous = len(self.rob) - 1
         else:

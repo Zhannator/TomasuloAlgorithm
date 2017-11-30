@@ -174,7 +174,7 @@ def main(input_filename): # argv is a list of command line arguments
         # SEPARATE FROM ROB
         
         #---------------------------------------------------------------------
-        # ISSUE STAGE
+        # ISSUE STAGE START
         #---------------------------------------------------------------------
         # can_issue_new_instuction = (available_instuction_in_instruction_buffer) & (available_rob_entry) &  (available_rs_entry)
         rob_dest = "-" # signifies that an instruction wasn't issued on this cycle if stays to be "-"
@@ -276,6 +276,10 @@ def main(input_filename): # argv is a list of command line arguments
             else:
                 print "Invalid instuction!"
                 exit(1)
+        
+        #---------------------------------------------------------------------
+        # ISSUE STAGE END
+        #---------------------------------------------------------------------
  
         # cycle through ROB
         rob_entry = rob.rob_head_node(rob_dest) 
