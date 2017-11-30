@@ -83,6 +83,7 @@ def main(input_filename): # argv is a list of command line arguments
     ls_buffer = [] # once addresses are calculated -> they are written to lsq_add
     stall_instruction_buffer = 0 # is 1 when want to stall instruction buffer
     branch_buffer = [] # [branch resolution, ready_cycle, rob_entry]
+    int_adder_fu_timer = [] # needed to keep track when int adder fus get freed
     #-------------------------------------------------
     # PIPELINE
     #-------------------------------------------------
@@ -106,7 +107,7 @@ def main(input_filename): # argv is a list of command line arguments
                 memory.mem_write(memory_buffer[0], memory_buffer[1])
                 #dequeue the lsq
                 lsq.lsq_dequeue(memory_buffer[2])
-                print "Update memory location " + str(memory_buffer[0]) + " to " + str(memory_buffer[1])
+                #print "Update memory location " + str(memory_buffer[0]) + " to " + str(memory_buffer[1])
                 memory_buffer = []
                         
         # UPDATE ARFobject
@@ -117,7 +118,7 @@ def main(input_filename): # argv is a list of command line arguments
         # CHECK CDB BUFFER
         if len(cdb_buffer) > 0:
             # update rs/rob
-            print "CDB UPDATE: " + cdb_buffer[0] + ", " + str(cdb_buffer[1])
+            #print "CDB UPDATE: " + cdb_buffer[0] + ", " + str(cdb_buffer[1])
             cdb_update(cdb_buffer[0], cdb_buffer[1])
             cdb_buffer = []
         
@@ -127,7 +128,7 @@ def main(input_filename): # argv is a list of command line arguments
                 available_ls_fu = available_ls_fu + 1
                 # update lsq
                 lsq.lsq_update_address(entry["destination"], entry["address"])
-                print "LSQ UPDATE ADDRESS: " + entry["destination"] + ", " + str(entry["address"])
+                #print "LSQ UPDATE ADDRESS: " + entry["destination"] + ", " + str(entry["address"])
                 del ls_buffer[index]
                 
         # UPDATE CDB USAGE
@@ -142,12 +143,14 @@ def main(input_filename): # argv is a list of command line arguments
                 if branch_buffer[0] == 1:
                     #set new PC
                     PC = int(rob.rob_get_destination(branch_buffer[2]))
-                    print "BRANCH MUST BE TAKEN"
-                else:
-                    print "BRANCH MUST NOT BE TAKEN"
                 branch_buffer = []
                 available_int_fu = available_int_fu + 1
-                            
+                #print "INCREASE AVAILABLE INT FU"
+           
+        if cycle_counter in int_adder_fu_timer:
+            #increment available available_int_fu
+            available_int_fu = available_int_fu + 1 
+            #print "INCREASE AVAILABLE INT FU"
         
         #############################
         #PRINTINT EVERY CYCLE
@@ -166,8 +169,8 @@ def main(input_filename): # argv is a list of command line arguments
             memory.mem_print_non_zero_values()                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      
             break
         
-        print "-------------------------- CYCLE " + str(cycle_counter) + " --------------------------"
-        print "available_int_fu: " + str(available_int_fu)
+        #print "-------------------------- CYCLE " + str(cycle_counter) + " --------------------------"
+        #print "available_int_fu: " + str(available_int_fu)
         # SEPARATE FROM ROB
         
         #---------------------------------------------------------------------
@@ -182,7 +185,7 @@ def main(input_filename): # argv is a list of command line arguments
         if stall_instruction_buffer == 0 and available_instuction_in_instruction_buffer and available_rob_entry:
             # get insturction
             instruction = instruction_buffer[(PC/4)]
-            print "issued instruction: " + instruction
+            #print "issued instruction: " + instruction
             instruction_parsed = instruction.split(" ")
             instruction_id = instruction_parsed[0]
             # check if there is an available rs entry based on instruction op       
@@ -277,7 +280,7 @@ def main(input_filename): # argv is a list of command line arguments
         # cycle through ROB
         rob_entry = rob.rob_head_node(rob_dest) 
         while rob_entry != -1:
-            print "-- checking rob entry " + rob_entry + " --"
+            #print "-- checking rob entry " + rob_entry + " --"
             rob_entry_state = rob.rob_get_state(rob_entry)
             rob_entry_instruction_id = rob.rob_get_instruction_id(rob_entry)
             if rob_entry_state == "MEM":
@@ -301,7 +304,7 @@ def main(input_filename): # argv is a list of command line arguments
                     # update rob state
                     rob.rob_update_state(rob_entry, "WB")
                     # update timing table
-                    print "WB FOR " + rob_entry + ": " + str(cycle_counter)
+                    #print "WB FOR " + rob_entry + ": " + str(cycle_counter)
                     timing_table.timing_table_update(rob.rob_get_tt_index(rob_entry), "WB", cycle_counter, 1)                    
             elif rob_entry_state == "EX" and rob_entry_instruction_id == "LD":  
                 #---------------------------------------------------------------------
@@ -313,14 +316,14 @@ def main(input_filename): # argv is a list of command line arguments
                     forwarding_happened = (lsq.lsq_forwarding(rob_entry) != -1)
                     if forwarding_happened:
                         #update timing table
-                        print "MEM FOR " + rob_entry + ": LD STARTS IN CYCLE " + str(cycle_counter) + " AND ENDS IN CYCLE " + str(cycle_counter)
+                        #print "MEM FOR " + rob_entry + ": LD STARTS IN CYCLE " + str(cycle_counter) + " AND ENDS IN CYCLE " + str(cycle_counter)
                         timing_table.timing_table_update(rob.rob_get_tt_index(rob_entry), "MEM", cycle_counter, 1)
                         #update rob
                         rob.rob_update_state(rob_entry, "MEM")
                     elif memory_is_in_use == 0:
                         #update timing table
                         memory_is_in_use = load_store_unit_properties["cycles_in_mem"]
-                        print "MEM FOR " + rob_entry + ": LD STARTS IN CYCLE " + str(cycle_counter) + " AND ENDS IN CYCLE " + str(cycle_counter + load_store_unit_properties["cycles_in_mem"]-1)
+                        #print "MEM FOR " + rob_entry + ": LD STARTS IN CYCLE " + str(cycle_counter) + " AND ENDS IN CYCLE " + str(cycle_counter + load_store_unit_properties["cycles_in_mem"]-1)
                         timing_table.timing_table_update(rob.rob_get_tt_index(rob_entry), "MEM", cycle_counter, load_store_unit_properties["cycles_in_mem"])
                         #update rob
                         rob.rob_update_state(rob_entry, "MEM")                        
@@ -338,14 +341,10 @@ def main(input_filename): # argv is a list of command line arguments
                     # update rob and set busy to no
                     rob.rob_update_value(rob_entry, "-")
                     # update timing table
-                    print "WB FOR " + rob_entry + ": " + str(cycle_counter)
+                    #print "WB FOR " + rob_entry + ": " + str(cycle_counter)
                     timing_table.timing_table_update(rob.rob_get_tt_index(rob_entry), "WB", cycle_counter, 1)
                 elif ex_stage_done and cdb_in_use == 0:
-                    # move to wb stage
-                    if rob_entry_instruction_id in ["ADD", "ADDI", "SUB", "BEQ", "BNE"]:
-                        #increment available available_int_fu
-                        available_int_fu = available_int_fu + 1 #MAY BE A PROBLEM (CHECK LATER - MAY NEED TO DO THIS BEFORE CYCLING THROUGH ROB) !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-                        
+                    # move to wb stage                
                     if rob_entry_instruction_id in ["ADD", "ADDI", "SUB", "ADD.D", "SUB.D", "MULT.D"]:
                         # normal writeback procedure
                         cdb_in_use = 1
@@ -385,7 +384,7 @@ def main(input_filename): # argv is a list of command line arguments
                         # update rob state
                         rob.rob_update_state(rob_entry, "WB")
                         # update timing table
-                        print "WB FOR " + rob_entry + ": " + str(cycle_counter)
+                        #print "WB FOR " + rob_entry + ": " + str(cycle_counter)
                         timing_table.timing_table_update(rob.rob_get_tt_index(rob_entry), "WB", cycle_counter, 1)
                     elif rob_entry_instruction_id in ["SD"]:
                         #when value is available -> write value (source) field to rob
@@ -397,7 +396,7 @@ def main(input_filename): # argv is a list of command line arguments
                             # update rob state
                             rob.rob_update_state(rob_entry, "WB")
                             # update timing table
-                            print "WB FOR " + rob_entry + ": " + str(cycle_counter)
+                            #print "WB FOR " + rob_entry + ": " + str(cycle_counter)
                             timing_table.timing_table_update(rob.rob_get_tt_index(rob_entry), "WB", cycle_counter, 1)                
             elif rob_entry_state == "ISSUE":    
                 #---------------------------------------------------------------------
@@ -410,22 +409,27 @@ def main(input_filename): # argv is a list of command line arguments
                     if no_dependencies and available_int_fu != 0:
                         # decrement available_int_fu
                         available_int_fu = available_int_fu - 1
+                        #print "DECREASE AVAILABLE INT FU " + str(available_int_fu)
                         #update stage info in rob
                         rob.rob_update_state(rob_entry, "EX")
                         #update stage infor in tt
-                        print "EX FOR " + rob_entry + ": ADD/ADDI STARTS IN CYCLE " + str(cycle_counter) + " AND ENDS IN CYCLE " + str(cycle_counter + int_adder_properties["cycles_in_ex"]-1)
+                        #print "EX FOR " + rob_entry + ": ADD/ADDI STARTS IN CYCLE " + str(cycle_counter) + " AND ENDS IN CYCLE " + str(cycle_counter + int_adder_properties["cycles_in_ex"]-1)
                         timing_table.timing_table_update(rob.rob_get_tt_index(rob_entry), "EX", cycle_counter, int_adder_properties["cycles_in_ex"])
+                        #add a timer for int adder instruction unit
+                        int_adder_fu_timer.append(cycle_counter + int_adder_properties["cycles_in_ex"])
                 elif rob_entry_instruction_id in ["SUB"]:
 					# find rs entry (by using ROB entry name)
                     no_dependencies = (rs.rs_no_dependencies("int_adder_rs", rob_entry) != -1)
                     if no_dependencies and available_int_fu != 0:
 						# decrement available_int_fu
                         available_int_fu = available_int_fu - 1
+                        #print "DECREASE AVAILABLE INT FU: " + str(available_int_fu)
                         #update stage info in rob
                         rob.rob_update_state(rob_entry, "EX")
                         #update stage infor in tt
-                        print "EX FOR " + rob_entry + ": SUB STARTS IN CYCLE " + str(cycle_counter) + " AND ENDS IN CYCLE " + str(cycle_counter + int_adder_properties["cycles_in_ex"]-1)
+                        #print "EX FOR " + rob_entry + ": SUB STARTS IN CYCLE " + str(cycle_counter) + " AND ENDS IN CYCLE " + str(cycle_counter + int_adder_properties["cycles_in_ex"]-1)
                         timing_table.timing_table_update(rob.rob_get_tt_index(rob_entry), "EX", cycle_counter, int_adder_properties["cycles_in_ex"])
+                        int_adder_fu_timer.append(cycle_counter + int_adder_properties["cycles_in_ex"])
                 elif rob_entry_instruction_id == "ADD.D":
 					# find rs entry (by using ROB entry name)
                     no_dependencies = (rs.rs_no_dependencies("fp_adder_rs", rob_entry) != -1)
@@ -435,7 +439,7 @@ def main(input_filename): # argv is a list of command line arguments
                         #update stage info in rob
                         rob.rob_update_state(rob_entry, "EX")
                         #update stage infor in tt
-                        print "EX FOR " + rob_entry + ": ADD.D STARTS IN CYCLE " + str(cycle_counter) + " AND ENDS IN CYCLE " + str(cycle_counter + fp_adder_properties["cycles_in_ex"]-1)
+                        #print "EX FOR " + rob_entry + ": ADD.D STARTS IN CYCLE " + str(cycle_counter) + " AND ENDS IN CYCLE " + str(cycle_counter + fp_adder_properties["cycles_in_ex"]-1)
                         timing_table.timing_table_update(rob.rob_get_tt_index(rob_entry), "EX", cycle_counter, fp_adder_properties["cycles_in_ex"])
                 elif rob_entry_instruction_id == "SUB.D":
 					# find rs entry (by using ROB entry name)
@@ -446,7 +450,7 @@ def main(input_filename): # argv is a list of command line arguments
                         #update stage info in rob
                         rob.rob_update_state(rob_entry, "EX")
                         #update stage infor in tt
-                        print "EX FOR " + rob_entry + ": SUB.D STARTS IN CYCLE " + str(cycle_counter) + " AND ENDS IN CYCLE " + str(cycle_counter + fp_adder_properties["cycles_in_ex"]-1)
+                        #print "EX FOR " + rob_entry + ": SUB.D STARTS IN CYCLE " + str(cycle_counter) + " AND ENDS IN CYCLE " + str(cycle_counter + fp_adder_properties["cycles_in_ex"]-1)
                         timing_table.timing_table_update(rob.rob_get_tt_index(rob_entry), "EX", cycle_counter, fp_adder_properties["cycles_in_ex"])
                 elif rob_entry_instruction_id == "MULT.D":
 					# find rs entry (by using ROB entry name)
@@ -457,22 +461,23 @@ def main(input_filename): # argv is a list of command line arguments
                         #update stage info in rob
                         rob.rob_update_state(rob_entry, "EX")
                         #update stage infor in tt
-                        print "EX FOR " + rob_entry + ": SUB.D STARTS IN CYCLE " + str(cycle_counter) + " AND ENDS IN CYCLE " + str(cycle_counter + fp_multiplier_properties["cycles_in_ex"]-1)
+                        #print "EX FOR " + rob_entry + ": SUB.D STARTS IN CYCLE " + str(cycle_counter) + " AND ENDS IN CYCLE " + str(cycle_counter + fp_multiplier_properties["cycles_in_ex"]-1)
                         timing_table.timing_table_update(rob.rob_get_tt_index(rob_entry), "EX", cycle_counter, fp_multiplier_properties["cycles_in_ex"])
                 elif rob_entry_instruction_id in ["BEQ", "BNE"]: # resolve branch using int adder
 					# find rs entry (by using ROB entry name)
                     no_dependencies = (rs.rs_no_dependencies("int_adder_rs", rob_entry) != -1)
                     if no_dependencies and available_int_fu != 0:
 						# decrement available_int_fu
-                        available_int_fu = available_int_fu - 1                       
+                        available_int_fu = available_int_fu - 1   
+                        #print "DECREASE AVAILABLE INT FU " + str(available_int_fu)
                         #resolve branch
                         values = rs.rs_get_values("int_adder_rs", rob_entry)
                         if rob_entry_instruction_id == "BEQ":
                             branch_buffer = [(values[0] == values[1]), int_adder_properties["cycles_in_ex"], rob_entry] # resolution, ready_cycle, rob_entry
-                            print "Branch formula: " + str(values[0]) + " == " + str(values[1])
+                            #print "Branch formula: " + str(values[0]) + " == " + str(values[1])
                         elif rob_entry_instruction_id == "BNE":
                             branch_buffer = [(values[0] != values[1]), int_adder_properties["cycles_in_ex"], rob_entry] # resolution, ready_cycle, rob_entry     
-                            print "Branch formula: " + str(values[0]) + " != " + str(values[1])
+                            #print "Branch formula: " + str(values[0]) + " != " + str(values[1])
                         #update stage info in rob
                         rob.rob_update_state(rob_entry, "EX")
                         #update stage infor in tt
@@ -484,7 +489,7 @@ def main(input_filename): # argv is a list of command line arguments
                         available_ls_fu = available_ls_fu - 1
 						# calculate address
                         values = lsq.lsq_get_address_values(rob_entry)
-                        print "LSQ values: " + str(values)
+                        #print "LSQ values: " + str(values)
                         ls_address = int(values[0])*4 + int(values[1])
                         # add calculated address to ls_buffer that will update lsq as soon as execution time is done
                         ls_buffer.append({"destination" : rob_entry, "address" : ls_address, "ready_cycle" : cycle_counter + load_store_unit_properties["cycles_in_ex"]}.copy())
@@ -493,7 +498,7 @@ def main(input_filename): # argv is a list of command line arguments
                         #update stage info in rob
                         rob.rob_update_state(rob_entry, "EX")
                         #update stage infor in tt
-                        print "EX FOR " + rob_entry + ": L/S STARTS IN CYCLE " + str(cycle_counter) + " AND ENDS IN CYCLE " + str(cycle_counter + load_store_unit_properties["cycles_in_ex"]-1)
+                        #print "EX FOR " + rob_entry + ": L/S STARTS IN CYCLE " + str(cycle_counter) + " AND ENDS IN CYCLE " + str(cycle_counter + load_store_unit_properties["cycles_in_ex"]-1)
                         timing_table.timing_table_update(rob.rob_get_tt_index(rob_entry), "EX", cycle_counter, load_store_unit_properties["cycles_in_ex"])
                         
             rob_entry = rob.rob_next(rob_entry, rob_dest) # get next rob entry
@@ -515,7 +520,7 @@ def main(input_filename): # argv is a list of command line arguments
                     rat.rat_update(rob_entry_data[1], rob_entry_data[1])
                 #update timing table
                 timing_table.timing_table_update(rob_entry_data[0], "COMMIT", cycle_counter, cycles_in_commit)    
-                print "COMMIT FOR " + rob_entry_data[4] + ": STARTS IN CYCLE " + str(cycle_counter) + " AND ENDS IN CYCLE " + str(cycle_counter + cycles_in_commit - 1)
+                #print "COMMIT FOR " + rob_entry_data[4] + ": STARTS IN CYCLE " + str(cycle_counter) + " AND ENDS IN CYCLE " + str(cycle_counter + cycles_in_commit - 1)
             elif rob_entry_data[3] == "SD" and memory_is_in_use == 0:
                 #clear rob entry
                 rob.rob_commit() # [tt_index, destination, value, instruction_id, rob_entry_name]
@@ -529,14 +534,14 @@ def main(input_filename): # argv is a list of command line arguments
                 #lsq.lsq_dequeue(rob_entry_data[4])
                 #update timing table
                 timing_table.timing_table_update(rob_entry_data[0], "COMMIT", cycle_counter, cycles_in_commit)    
-                print "COMMIT FOR " + rob_entry_data[4] + ": STARTS IN CYCLE " + str(cycle_counter) + " AND ENDS IN CYCLE " + str(cycle_counter + cycles_in_commit - 1)        
+                #print "COMMIT FOR " + rob_entry_data[4] + ": STARTS IN CYCLE " + str(cycle_counter) + " AND ENDS IN CYCLE " + str(cycle_counter + cycles_in_commit - 1)        
             elif rob_entry_data[3] in ["BEQ", "BNE"]:
                 #clear rob entry
                 rob.rob_commit() # [tt_index, destination, value, instruction_id, rob_entry_name]
                 cycles_in_commit = 1
                 #update timing table
                 timing_table.timing_table_update(rob_entry_data[0], "COMMIT", cycle_counter, cycles_in_commit)    
-                print "COMMIT FOR " + rob_entry_data[4] + ": STARTS IN CYCLE " + str(cycle_counter) + " AND ENDS IN CYCLE " + str(cycle_counter + cycles_in_commit - 1)
+                #print "COMMIT FOR " + rob_entry_data[4] + ": STARTS IN CYCLE " + str(cycle_counter) + " AND ENDS IN CYCLE " + str(cycle_counter + cycles_in_commit - 1)
 ############################################################################################################
 
 ############################################################################################################
@@ -557,22 +562,47 @@ def input_file_decoder(input_filename):
             int_adder_properties["num_rs"] = int(line[1])
             int_adder_properties["cycles_in_ex"] = int(line[2])
             int_adder_properties["num_fus"] = int(line[3])
+            print "###############################################################################################################################################################"
+            print "{:^159}".format("INTEGER ADDER PROPERTIES")
+            print "###############################################################################################################################################################"
+            print "Number of reservation stations: " + str(int_adder_properties["num_rs"])
+            print "Number of cycles in execution stage: " + str(int_adder_properties["cycles_in_ex"])
+            print "Number of function Units: " + str(int_adder_properties["num_fus"])
         elif(line[0] == "FP_ADDER"):
             # set fp_adder_properties
             fp_adder_properties["num_rs"] = int(line[1])
             fp_adder_properties["cycles_in_ex"] = int(line[2])
             fp_adder_properties["num_fus"] = int(line[3])
+            print "###############################################################################################################################################################"
+            print "{:^159}".format("FP ADDER PROPERTIES")
+            print "###############################################################################################################################################################"
+            print "Number of reservation stations: " + str(int_adder_properties["num_rs"])
+            print "Number of cycles in execution stage: " + str(int_adder_properties["cycles_in_ex"])
+            print "Number of function Units: " + str(int_adder_properties["num_fus"])
         elif(line[0] == "FP_MULTIPLIER"):
             # set fp_multiplier_properties
             fp_multiplier_properties["num_rs"] = int(line[1])
             fp_multiplier_properties["cycles_in_ex"] = int(line[2])
             fp_multiplier_properties["num_fus"] = int(line[3])
+            print "###############################################################################################################################################################"
+            print "{:^159}".format("FP MULTIPLIER PROPERTIES")
+            print "###############################################################################################################################################################"
+            print "Number of reservation stations: " + str(fp_multiplier_properties["num_rs"])
+            print "Number of cycles in execution stage: " + str(fp_multiplier_properties["cycles_in_ex"])
+            print "Number of function Units: " + str(fp_multiplier_properties["num_fus"])
         elif(line[0] == "LOAD_STORE_UNIT"):
             # set load_store_unit_properties
             load_store_unit_properties["num_rs"] = int(line[1])
             load_store_unit_properties["cycles_in_ex"] = int(line[2])
             load_store_unit_properties["cycles_in_mem"] = int(line[3])
             load_store_unit_properties["num_fus"] = int(line[4])
+            print "###############################################################################################################################################################"
+            print "{:^159}".format("LOAD STORE UNIT PROPERTIES")
+            print "###############################################################################################################################################################"
+            print "Number of reservation stations: " + str(load_store_unit_properties["num_rs"])
+            print "Number of cycles in execution stage: " + str(load_store_unit_properties["cycles_in_ex"])
+            print "Number of cycles in memory stage: " + str(load_store_unit_properties["cycles_in_mem"])
+            print "Number of function Units: " + str(load_store_unit_properties["num_fus"])
         elif(line[0] == "ROB_ENTRIES"):
             # set num_rob_entries
             num_rob_entries = int(line[1])
@@ -608,9 +638,7 @@ def get_current_reg_info(reg_name): # returns [v, q]
     else: # if R or F -> 
         # pull value from ARFobject
         return [arf.reg_read(reg_value), "-"]
-    
-    print "GET CURRENT REG INFO TODO"
-    
+        
 def cdb_update(destination, value):
     # when value is ready in RS -> broadcast values to ROB, RS
     # other situations

@@ -67,8 +67,8 @@ class ROBobject:
             #if ready to commit -> clear entry and return [destination, value]
             # return_value = [tt_index, destination, value, instruction_id, rob_entry_name]
             return_value = [self.rob[self.rob_check_counter]["timing_table_entry_index"], self.rob[self.rob_check_counter]["destination"], self.rob[self.rob_check_counter]["value"], self.rob[self.rob_check_counter]["instruction"].split(" ")[0], "ROB"+str(self.rob_check_counter)]
-            print "ROB" + str(self.rob_check_counter) + " is ready to commit"           
-            print return_value
+            #print "ROB" + str(self.rob_check_counter) + " is ready to commit"           
+            #print return_value
             return return_value
         else:
             return -1

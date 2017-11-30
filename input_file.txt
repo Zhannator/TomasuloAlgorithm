@@ -1,16 +1,21 @@
-# FU_name #_of_rs cycles_in_EX #_of_FUs
-int_adder 2 1 2
+int_adder 2 1 1
 fp_adder 3 3 1
 fp_multiplier 2 20 1
-# FU_name #_of_rs cycles_in_EX cycles_in_mem #_of_FUs
-load_store_unit 3 3 4 1
-# rob_entries #_of_rob_entries
-rob_entries 10
-# reg reg_name reg_value
-reg F1 4.4
-# mem mem_address mem_value
-# mem 4 1
-# instructions
-ADDI R1 R0 0
-SD F1 0(R1)
-LD F2 0(R0)
+load_store_unit 3 1 4 1
+rob_entries 2
+reg R1 0
+reg R2 2
+reg R3 4
+reg R4 0
+reg F1 0
+reg F2 0
+reg F3 1.1
+reg F4 2.5
+reg F5 0
+reg F6 4.4
+reg F7 5.5
+add R1 R2 R3
+sub R4 R2 R3
+Mult.d F1 F6 F7
+Add.d F2 F3 F4
+Sub.d F5 F3 F4

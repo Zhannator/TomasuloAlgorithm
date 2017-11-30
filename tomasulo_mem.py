@@ -41,5 +41,5 @@ class MEMobject:
         print row_format.format(*["ADDRESS", "VALUE"])
         for address, word in enumerate(self.memory):
             if word != 0:
-                print row_format.format(*[address, word])
+                print row_format.format(*[address*4, word])
         print
