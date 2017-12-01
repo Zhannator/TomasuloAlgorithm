@@ -8,7 +8,7 @@ class MEMobject:
     
     def mem_initialize(self):
         # code to initialize memory
-        self.memory = [0]*64 # 265B (64W)
+        self.memory = [0]*64 # 256B (64W)
 
     def mem_write(self, addr, value):
         # code to store value at addr

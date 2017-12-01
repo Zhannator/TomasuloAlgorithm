@@ -158,11 +158,12 @@ def main(input_filename): # argv is a list of command line arguments
         #PRINTINT EVERY CYCLE
         #############################
         rob.rob_print()
-        #rs.rs_print()
-        #lsq.lsq_print()
-        #timing_table.time_table_print()
-        #memory.mem_print_non_zero_values()
-        #arf.reg_print()
+        rs.rs_print()
+        lsq.lsq_print()
+        timing_table.time_table_print()
+        memory.mem_print_non_zero_values()
+        arf.reg_print()
+        rat.rat_print()
         
         # print results and exit if rob is empty and instruction_buffer is exerted
         if (rob.rob_empty() == 1) and ((PC/4) >= len(instruction_buffer)) and (memory_is_in_use == 0):
@@ -171,7 +172,7 @@ def main(input_filename): # argv is a list of command line arguments
             memory.mem_print_non_zero_values()                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      
             break
         
-        #print "-------------------------- CYCLE " + str(cycle_counter) + " --------------------------"
+        print "-------------------------- CYCLE " + str(cycle_counter) + " --------------------------"
         #print "available_int_fu: " + str(available_int_fu)
         # SEPARATE FROM ROB
         
