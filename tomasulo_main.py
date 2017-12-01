@@ -84,6 +84,7 @@ def main(input_filename): # argv is a list of command line arguments
     stall_instruction_buffer = 0 # is 1 when want to stall instruction buffer
     branch_buffer = [] # [branch resolution, ready_cycle, rob_entry]
     int_adder_fu_timer = [] # needed to keep track when int adder fus get freed
+    
     #-------------------------------------------------
     # PIPELINE
     #-------------------------------------------------
@@ -156,7 +157,7 @@ def main(input_filename): # argv is a list of command line arguments
         #############################
         #PRINTINT EVERY CYCLE
         #############################
-        #rob.rob_print()
+        rob.rob_print()
         #rs.rs_print()
         #lsq.lsq_print()
         #timing_table.time_table_print()
@@ -275,10 +276,11 @@ def main(input_filename): # argv is a list of command line arguments
                     timing_table.timing_table_add(PC, instruction, cycle_counter)
                     PC = PC + 4
             else:
-                print "Invalid instuction!"
+                print "Invalid instruction!"
                 exit(1)
  
         # cycle through ROB
+        # check what to do with instructions that are in ISSUE/EX/MEM stages
         rob_entry = rob.rob_head_node(rob_dest) 
         while rob_entry != -1:
             #print "-- checking rob entry " + rob_entry + " --"
@@ -605,6 +607,10 @@ def input_file_decoder(input_filename):
         elif(line[0] == "ROB_ENTRIES"):
             # set num_rob_entries
             num_rob_entries = int(line[1])
+            print "###############################################################################################################################################################"
+            print "{:^159}".format("ROB PROPERTIES")
+            print "###############################################################################################################################################################"
+            print "Number of rob entries: " + str(num_rob_entries)
         elif(line[0] == "REG"):
             # set register value
             arf.reg_write(line[1], line[2])
