@@ -92,6 +92,9 @@ class LSQobject:
         #pop the oldest instruction from the queue
         if self.lsq[0]["dest"] == rob_entry:
             del self.lsq[0]
+            return 1
+        else:
+            return -1
 
     def lsq_get_fwd_value(self, rob_entry):
         for entry in self.lsq:

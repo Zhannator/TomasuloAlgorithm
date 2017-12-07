@@ -84,7 +84,7 @@ def main(input_filename): # argv is a list of command line arguments
     stall_instruction_buffer = 0 # is 1 when want to stall instruction buffer
     branch_buffer = [] # [branch resolution, ready_cycle, rob_entry]
     int_adder_fu_timer = [] # needed to keep track when int adder fus get freed
-    
+    load_inst_ready_to_dequeue = [] # for dequeue of load instructions
     #-------------------------------------------------
     # PIPELINE
     #-------------------------------------------------
@@ -108,6 +108,7 @@ def main(input_filename): # argv is a list of command line arguments
                 memory.mem_write(memory_buffer[0], memory_buffer[1])
                 #dequeue the lsq
                 lsq.lsq_dequeue(memory_buffer[2])
+                #print "Dequeue " + memory_buffer[2]
                 #print "Update memory location " + str(memory_buffer[0]) + " to " + str(memory_buffer[1])
                 memory_buffer = []
                         
@@ -153,6 +154,13 @@ def main(input_filename): # argv is a list of command line arguments
             #increment available available_int_fu
             available_int_fu = available_int_fu + 1 
             #print "INCREASE AVAILABLE INT FU"
+        
+        # LOAD DEQUEUE
+        if len(load_inst_ready_to_dequeue) > 0:
+            for index, entry in enumerate(load_inst_ready_to_dequeue):
+                if lsq.lsq_dequeue(entry) == 1:
+                    #print "Dequeue " + str(entry)
+                    del load_inst_ready_to_dequeue[index]
         
         #############################
         #PRINTINT EVERY CYCLE
@@ -302,7 +310,8 @@ def main(input_filename): # argv is a list of command line arguments
                         #write loaded value to a list of values loaded from memory
                         result = memory.mem_read(lsq.lsq_get_address(rob_entry))
                     #dequeue lsq
-                    lsq.lsq_dequeue(rob_entry) #MAY BE A PROBLEM (CHECK LATER - MAY NEED TO DO THIS BEFORE CYCLING THROUGH ROB) !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!                    
+                    #set flag to dequeue load instr from load_store_queue
+                    load_inst_ready_to_dequeue.append(rob_entry)
                     # add result to cdb buffer                        
                     cdb_buffer = [rob_entry, result]    
                     # update rob state
@@ -407,6 +416,7 @@ def main(input_filename): # argv is a list of command line arguments
                 # ISSUE -> EX
                 #---------------------------------------------------------------------            
                 #can_move_to_ex_stage = (alu_int_instruction) & (no_register_dependencies) & (available_int_fu) or (!alu_int_instruction) & (no_register_dependencies)
+                #print rob_entry + " ISSUE -> EX"
                 if rob_entry_instruction_id in ["ADD", "ADDI"]:
                     # find rs entry (by using ROB entry name)
                     no_dependencies = (rs.rs_no_dependencies("int_adder_rs", rob_entry) != -1)
@@ -486,8 +496,10 @@ def main(input_filename): # argv is a list of command line arguments
                         rob.rob_update_state(rob_entry, "EX")
                         #update stage infor in tt
                         timing_table.timing_table_update(rob.rob_get_tt_index(rob_entry), "EX", cycle_counter, int_adder_properties["cycles_in_ex"])
-                elif instruction_id in ["SD", "LD"]: # calculate address
+                elif rob_entry_instruction_id in ["SD", "LD"]: # calculate address
                     no_dependencies = (lsq.lsq_addr_reg_ready(rob_entry) != -1)
+                    #print "NO DEPENDENCIES: " + str(no_dependencies)
+                    #print "available ls fu: " + str(available_ls_fu)
                     if no_dependencies and available_ls_fu != 0:
                         # decrement available_ls_fu
                         available_ls_fu = available_ls_fu - 1
@@ -535,7 +547,7 @@ def main(input_filename): # argv is a list of command line arguments
                 #set memory in use
                 memory_is_in_use = load_store_unit_properties["cycles_in_mem"]                
                 #update timing table
-                timing_table.timing_table_update(rob_entry_data[0], "COMMIT", cycle_counter, cycles_in_commit)    
+                timing_table.timing_table_update(rob_entry_data[0], "COMMIT", cycle_counter, cycles_in_commit)
                 #print "COMMIT FOR " + rob_entry_data[4] + ": STARTS IN CYCLE " + str(cycle_counter) + " AND ENDS IN CYCLE " + str(cycle_counter + cycles_in_commit - 1)        
             elif rob_entry_data[3] in ["BEQ", "BNE"]:
                 #clear rob entry
