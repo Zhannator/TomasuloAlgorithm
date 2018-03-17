@@ -19,7 +19,6 @@ ALU Instructions
     Add Rd, Rs, Rt	Rd = Rs + Rt	Integer
     Add.d Fd, Fs, Ft	Fd = Fs + Ft	FP
     Addi Rt, Rs, immediate	Rt = Rs + immediate	Integer
-    Sub Rd, Rs, Rt	Rd = Rs - Rt	Integer
     Sub.d Fd, Fs, Ft	Fd = Fs – Ft	FP
     Mult.d Fd, Fs, Ft	Fd = Fs * Ft, assume Fd is enough to hold the result FP
     
